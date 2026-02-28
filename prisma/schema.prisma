@@ -1,0 +1,251 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+}
+
+enum SantriStatus {
+  AKTIF
+  NONAKTIF
+  LULUS
+  KELUAR
+}
+
+enum Gender {
+  L
+  P
+}
+
+enum KomponenTipe {
+  BULANAN
+  INSIDENTAL
+}
+
+enum DiskonEligibilityRule {
+  NONE
+  SIBLING_FAMILY
+  SANTRI_YATIM
+  SANTRI_KELUARGA_NDALEM
+}
+
+enum RuleCakupanType {
+  GLOBAL
+  KELAS
+  GENDER
+  SANTRI
+}
+
+enum RuleTagihanStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum TargetTagihanType {
+  SEMUA_SANTRI
+  GENDER
+  KELAS
+  SPESIFIK_SANTRI
+}
+
+enum TagihanMasterStatus {
+  SCHEDULED
+  ACTIVE
+  ENDED
+  INACTIVE
+}
+
+enum TagihanStatus {
+  TERBIT
+  SEBAGIAN
+  LUNAS
+  BATAL
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  role         UserRole @default(ADMIN)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Kelas {
+  id        String   @id @default(cuid())
+  nama      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  santri    Santri[]
+  ruleTagihan RuleTagihan[]
+  tagihanMasterDetail TagihanMasterDetail[]
+}
+
+model Keluarga {
+  id               String   @id @default(cuid())
+  kodeKeluarga     String   @unique
+  namaKepalaFamily String?
+  keterangan       String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  santri           Santri[]
+}
+
+model Santri {
+  id             String       @id @default(cuid())
+  nis            String       @unique
+  nama           String
+  status         SantriStatus @default(AKTIF)
+  gender         Gender
+  kelasId        String
+  keluargaId     String?
+  yatim          Boolean      @default(false)
+  keluargaNdalem Boolean      @default(false)
+  tanggalMasuk   DateTime?
+  tanggalKeluar DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  kelas          Kelas        @relation(fields: [kelasId], references: [id])
+  keluarga       Keluarga?    @relation(fields: [keluargaId], references: [id])
+  ruleTagihan    RuleTagihan[]
+  tagihan        Tagihan[]
+  tagihanMasterDetail TagihanMasterDetail[]
+}
+
+model KomponenTagihan {
+  id             String            @id @default(cuid())
+  kode           String            @unique
+  nama           String
+  tipe           KomponenTipe
+  active         Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  diskonKomponen DiskonKomponen[]
+  ruleTagihan    RuleTagihan[]
+  tagihanMaster  TagihanMaster[]
+  tagihan        Tagihan[]
+}
+
+model DiskonKategori {
+  id              String                @id @default(cuid())
+  kode            String                @unique
+  nama            String
+  eligibilityRule DiskonEligibilityRule @default(NONE)
+  siblingCountMin Int?
+  active          Boolean               @default(true)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  diskonKomponen  DiskonKomponen[]
+}
+
+model DiskonKomponen {
+  id          String         @id @default(cuid())
+  komponenId  String
+  kategoriId  String
+  persentase  Float
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  komponen    KomponenTagihan @relation(fields: [komponenId], references: [id])
+  kategori    DiskonKategori  @relation(fields: [kategoriId], references: [id])
+
+  @@unique([komponenId, kategoriId])
+}
+
+model RuleTagihan {
+  id         String            @id @default(cuid())
+  komponenId String
+  nominal    Float
+  cakupan    RuleCakupanType
+  kelasId    String?
+  gender     Gender?
+  santriId   String?
+  status     RuleTagihanStatus @default(DRAFT)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  komponen   KomponenTagihan   @relation(fields: [komponenId], references: [id])
+  kelas      Kelas?            @relation(fields: [kelasId], references: [id])
+  santri     Santri?           @relation(fields: [santriId], references: [id])
+}
+
+model TagihanMaster {
+  id                   String              @id @default(cuid())
+  komponenId           String
+  targetType           TargetTagihanType
+  status               TagihanMasterStatus @default(SCHEDULED)
+  autoGenerateEnabled  Boolean             @default(true)
+  nominalGlobal        Float?
+  startBulan           Int?
+  startTahun           Int?
+  endBulan             Int?
+  endTahun             Int?
+  lastGeneratedPeriod  String?
+  tanggalTerbit        DateTime?
+  jatuhTempo           DateTime
+  keterangan           String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  komponen             KomponenTagihan      @relation(fields: [komponenId], references: [id])
+  details         TagihanMasterDetail[]
+  tagihan         Tagihan[]
+  generateLogs    TagihanGenerateLog[]
+}
+
+model TagihanMasterDetail {
+  id          String       @id @default(cuid())
+  masterId    String
+  gender      Gender?
+  kelasId     String?
+  santriId    String?
+  nominal     Float
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  master      TagihanMaster @relation(fields: [masterId], references: [id], onDelete: Cascade)
+  kelas       Kelas?        @relation(fields: [kelasId], references: [id])
+  santri      Santri?       @relation(fields: [santriId], references: [id])
+}
+
+model Tagihan {
+  id            String       @id @default(cuid())
+  masterId      String
+  santriId      String
+  komponenId    String
+  periodeKey    String
+  nominal       Float
+  jatuhTempo    DateTime
+  status        TagihanStatus @default(TERBIT)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  master        TagihanMaster @relation(fields: [masterId], references: [id])
+  santri        Santri        @relation(fields: [santriId], references: [id])
+  komponen      KomponenTagihan @relation(fields: [komponenId], references: [id])
+
+  @@unique([santriId, komponenId, periodeKey])
+}
+
+model TagihanGenerateLog {
+  id            String   @id @default(cuid())
+  masterId      String
+  periodeKey    String
+  source        String
+  totalTarget   Int
+  generated     Int
+  skipped       Int
+  success       Boolean
+  message       String?
+  createdAt     DateTime @default(now())
+
+  master        TagihanMaster @relation(fields: [masterId], references: [id], onDelete: Cascade)
+}
