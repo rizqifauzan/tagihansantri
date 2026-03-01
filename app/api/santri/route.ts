@@ -2,6 +2,7 @@ import { Gender, Prisma, SantriStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/api-auth";
 import { parsePageQuery, toOptionalDate } from "@/lib/api-utils";
+import { autoApplySantriBaruTagihan } from "@/lib/auto-apply-santri-baru";
 import { buildNis, getNextNisSequence } from "@/lib/nis";
 import { prisma } from "@/lib/prisma";
 
@@ -105,7 +106,19 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        return NextResponse.json(created, { status: 201 });
+        let autoAppliedCount = 0;
+        try {
+          autoAppliedCount = await autoApplySantriBaruTagihan({
+            id: created.id,
+            gender: created.gender,
+            kelasId: created.kelasId,
+            createdAt: created.createdAt,
+            status: created.status,
+          });
+        } catch (err) {
+          console.error("Auto apply SANTRI_BARU gagal:", err);
+        }
+        return NextResponse.json({ ...created, autoAppliedTagihanCount: autoAppliedCount }, { status: 201 });
       } catch (error) {
         if (
           error instanceof Prisma.PrismaClientKnownRequestError &&

@@ -6,7 +6,7 @@ type Komponen = {
   id: string;
   kode: string;
   nama: string;
-  tipe: "BULANAN" | "INSIDENTAL";
+  tipe: "BULANAN" | "INSIDENTAL" | "SANTRI_BARU";
   active: boolean;
 };
 
@@ -16,7 +16,7 @@ type KomponenListResponse = {
   totalPages: number;
 };
 
-const TIPE_OPTIONS = ["BULANAN", "INSIDENTAL"] as const;
+const TIPE_OPTIONS = ["BULANAN", "INSIDENTAL", "SANTRI_BARU"] as const;
 
 export default function KomponenTagihanPage() {
   const [rows, setRows] = useState<Komponen[]>([]);
@@ -161,6 +161,7 @@ export default function KomponenTagihanPage() {
         >
           <option value="BULANAN">Bulanan</option>
           <option value="INSIDENTAL">Insidental</option>
+          <option value="SANTRI_BARU">Santri Baru</option>
         </select>
 
         <label className="checkbox-row">

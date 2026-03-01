@@ -1,6 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+const formatNumber = (value: number) => value.toLocaleString("id-ID");
+const parseNumberInput = (value: string) => Number((value || "").replace(/\./g, "")) || 0;
+const formatNumberInput = (value: string) => {
+  const digits = (value || "").replace(/\D/g, "");
+  if (!digits) return "";
+  return Number(digits).toLocaleString("id-ID");
+};
 
 type Cakupan = "GLOBAL" | "KELAS" | "GENDER" | "SANTRI";
 type Status = "DRAFT" | "PUBLISHED";
@@ -35,7 +42,7 @@ export default function RuleTagihanPage() {
 
   const [formId, setFormId] = useState<string | null>(null);
   const [komponenId, setKomponenId] = useState("");
-  const [nominal, setNominal] = useState("100000");
+  const [nominal, setNominal] = useState("100.000");
   const [cakupan, setCakupan] = useState<Cakupan>("GLOBAL");
   const [kelasId, setKelasId] = useState("");
   const [gender, setGender] = useState<"L" | "P">("L");
@@ -88,14 +95,14 @@ export default function RuleTagihanPage() {
 
   function resetForm() {
     setFormId(null);
-    setNominal("100000");
+    setNominal("100.000");
     setCakupan("GLOBAL");
   }
 
   function buildPayload() {
     return {
       komponenId,
-      nominal: Number(nominal),
+      nominal: parseNumberInput(nominal),
       cakupan,
       kelasId: cakupan === "KELAS" ? kelasId : null,
       gender: cakupan === "GENDER" ? gender : null,
@@ -180,7 +187,7 @@ export default function RuleTagihanPage() {
         </select>
 
         <label htmlFor="nominal">Nominal</label>
-        <input id="nominal" type="number" min="1" value={nominal} onChange={(e) => setNominal(e.target.value)} />
+        <input id="nominal" inputMode="numeric" value={nominal} onChange={(e) => setNominal(formatNumberInput(e.target.value))} />
 
         <label htmlFor="cakupan">Cakupan</label>
         <select id="cakupan" value={cakupan} onChange={(e) => setCakupan(e.target.value as Cakupan)}>
@@ -242,7 +249,7 @@ export default function RuleTagihanPage() {
               <tr key={row.id}>
                 <td>{row.komponen.kode} - {row.komponen.nama}</td>
                 <td>{cakupanText(row)}</td>
-                <td>{row.nominal}</td>
+                <td>{formatNumber(row.nominal)}</td>
                 <td>{row.status}</td>
                 <td>
                   <div className="row-actions">
@@ -251,7 +258,7 @@ export default function RuleTagihanPage() {
                         <button type="button" onClick={() => {
                           setFormId(row.id);
                           setKomponenId(row.komponen.id);
-                          setNominal(String(row.nominal));
+                          setNominal(formatNumber(row.nominal));
                           setCakupan(row.cakupan);
                           setKelasId(row.kelasId || kelasOptions[0]?.id || "");
                           setGender((row.gender || "L") as "L" | "P");

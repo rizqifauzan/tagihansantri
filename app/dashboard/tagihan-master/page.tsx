@@ -2,9 +2,9 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-type TargetType = "SEMUA_SANTRI" | "GENDER" | "KELAS" | "SPESIFIK_SANTRI";
+type TargetType = "SEMUA_SANTRI" | "GENDER" | "KELAS" | "SPESIFIK_SANTRI" | "SANTRI_BARU";
 type Status = "SCHEDULED" | "ACTIVE" | "ENDED" | "INACTIVE";
-type Komponen = { id: string; kode: string; nama: string; tipe: "BULANAN" | "INSIDENTAL" };
+type Komponen = { id: string; kode: string; nama: string; tipe: "BULANAN" | "INSIDENTAL" | "SANTRI_BARU" };
 type Kelas = { id: string; nama: string };
 type Santri = { id: string; nis: string; nama: string };
 type UserOption = { id: string; username: string; active: boolean };
@@ -32,6 +32,7 @@ type Master = {
   endBulan: number | null;
   endTahun: number | null;
   lastGeneratedPeriod: string | null;
+  jatuhTempoHari: number | null;
   tanggalTerbit: string | null;
   jatuhTempo: string;
   keterangan: string | null;
@@ -76,6 +77,13 @@ function defaultJatuhTempoInsidental(base: Date): string {
   const next30Days = new Date(base.getFullYear(), base.getMonth(), base.getDate() + 30);
   return toDateInputValue(next30Days);
 }
+const formatNumber = (value: number) => value.toLocaleString("id-ID");
+const parseNumberInput = (value: string) => Number((value || "").replace(/\./g, "")) || 0;
+const formatNumberInput = (value: string) => {
+  const digits = (value || "").replace(/\D/g, "");
+  if (!digits) return "";
+  return Number(digits).toLocaleString("id-ID");
+};
 
 export default function TagihanMasterPage() {
   const now = new Date();
@@ -97,9 +105,9 @@ export default function TagihanMasterPage() {
   const [picPutraUserId, setPicPutraUserId] = useState("");
   const [picPutriUserId, setPicPutriUserId] = useState("");
   const [picKelasUser, setPicKelasUser] = useState<Record<string, string>>({});
-  const [nominalGlobal, setNominalGlobal] = useState("100000");
-  const [nominalL, setNominalL] = useState("100000");
-  const [nominalP, setNominalP] = useState("100000");
+  const [nominalGlobal, setNominalGlobal] = useState("100.000");
+  const [nominalL, setNominalL] = useState("100.000");
+  const [nominalP, setNominalP] = useState("100.000");
   const [kelasNominal, setKelasNominal] = useState<Record<string, string>>({});
   const [spesifik, setSpesifik] = useState<Array<{ santriId: string; nominal: string }>>([]);
 
@@ -107,6 +115,7 @@ export default function TagihanMasterPage() {
   const [startTahun, setStartTahun] = useState(String(now.getFullYear()));
   const [endBulan, setEndBulan] = useState("12");
   const [endTahun, setEndTahun] = useState("2100");
+  const [jatuhTempoHari, setJatuhTempoHari] = useState("30");
 
   const [tanggalTerbit, setTanggalTerbit] = useState(toDateInputValue(now));
   const [jatuhTempo, setJatuhTempo] = useState("");
@@ -163,7 +172,7 @@ export default function TagihanMasterPage() {
     const nextKelasNominal: Record<string, string> = {};
     const nextPicKelas: Record<string, string> = {};
     klJson.data.forEach((k: Kelas) => {
-      nextKelasNominal[k.id] = kelasNominal[k.id] || "100000";
+      nextKelasNominal[k.id] = kelasNominal[k.id] || "100.000";
       nextPicKelas[k.id] = picKelasUser[k.id] || "";
     });
     setKelasNominal(nextKelasNominal);
@@ -190,15 +199,21 @@ export default function TagihanMasterPage() {
       setJatuhTempo(defaultJatuhTempoBulanan(new Date()));
       return;
     }
-    if (selectedKomponen?.tipe === "INSIDENTAL") {
+    if (selectedKomponen?.tipe === "INSIDENTAL" || selectedKomponen?.tipe === "SANTRI_BARU") {
       setJatuhTempo(defaultJatuhTempoInsidental(new Date()));
     }
   }, [selectedKomponen?.tipe, editingId]);
 
+  useEffect(() => {
+    if (selectedKomponen?.tipe === "INSIDENTAL" && autoGenerateEnabled) {
+      setAutoGenerateEnabled(false);
+    }
+  }, [selectedKomponen?.tipe, autoGenerateEnabled]);
+
   function resetForm() {
     const baseKelasNominal: Record<string, string> = {};
     kelas.forEach((k) => {
-      baseKelasNominal[k.id] = "100000";
+      baseKelasNominal[k.id] = "100.000";
     });
 
     setEditingId("");
@@ -211,15 +226,16 @@ export default function TagihanMasterPage() {
     setPicPutraUserId(firstUserId);
     setPicPutriUserId(firstUserId);
     setPicKelasUser(Object.fromEntries(kelas.map((k) => [k.id, firstUserId])));
-    setNominalGlobal("100000");
-    setNominalL("100000");
-    setNominalP("100000");
+    setNominalGlobal("100.000");
+    setNominalL("100.000");
+    setNominalP("100.000");
     setKelasNominal(baseKelasNominal);
     setSpesifik([]);
     setStartBulan(String(now.getMonth() + 1));
     setStartTahun(String(now.getFullYear()));
     setEndBulan("12");
     setEndTahun("2100");
+    setJatuhTempoHari("30");
     setTanggalTerbit(toDateInputValue(now));
     if (selectedKomponen?.tipe === "BULANAN") {
       setJatuhTempo(defaultJatuhTempoBulanan(now));
@@ -245,26 +261,27 @@ export default function TagihanMasterPage() {
       kelasPicMap[k.id] = found?.picUserId || "";
     });
     setPicKelasUser(kelasPicMap);
-    setNominalGlobal(String(master.nominalGlobal || 0));
+    setNominalGlobal(formatNumber(master.nominalGlobal || 0));
     setStartBulan(String(master.startBulan || now.getMonth() + 1));
     setStartTahun(String(master.startTahun || now.getFullYear()));
     setEndBulan(String(master.endBulan || 12));
     setEndTahun(String(master.endTahun || 2100));
+    setJatuhTempoHari(String(master.jatuhTempoHari || 30));
     setTanggalTerbit(master.tanggalTerbit ? toDateInputValue(new Date(master.tanggalTerbit)) : toDateInputValue(now));
     setJatuhTempo(toDateInputValue(new Date(master.jatuhTempo)));
     setKeterangan(master.keterangan || "");
 
     if (master.targetType === "GENDER") {
       const nominalByGender = new Map(master.details.filter((d) => d.gender).map((d) => [d.gender, d.nominal]));
-      setNominalL(String(nominalByGender.get("L") || 0));
-      setNominalP(String(nominalByGender.get("P") || 0));
+      setNominalL(formatNumber(nominalByGender.get("L") || 0));
+      setNominalP(formatNumber(nominalByGender.get("P") || 0));
     }
 
     if (master.targetType === "KELAS") {
       const nominalByKelas = new Map(master.details.filter((d) => d.kelasId).map((d) => [d.kelasId as string, d.nominal]));
       const nextKelasNominal: Record<string, string> = {};
       kelas.forEach((k) => {
-        nextKelasNominal[k.id] = String(nominalByKelas.get(k.id) || 0);
+        nextKelasNominal[k.id] = formatNumber(nominalByKelas.get(k.id) || 0);
       });
       setKelasNominal(nextKelasNominal);
     }
@@ -272,7 +289,7 @@ export default function TagihanMasterPage() {
     if (master.targetType === "SPESIFIK_SANTRI") {
       setSpesifik(master.details.filter((d) => d.santriId).map((d) => ({
         santriId: d.santriId as string,
-        nominal: String(d.nominal),
+        nominal: formatNumber(d.nominal),
       })));
     } else {
       setSpesifik([]);
@@ -304,7 +321,7 @@ export default function TagihanMasterPage() {
 
   function addSpesifikRow() {
     if (!santri[0]) return;
-    setSpesifik((prev) => [...prev, { santriId: santri[0].id, nominal: "100000" }]);
+    setSpesifik((prev) => [...prev, { santriId: santri[0].id, nominal: "100.000" }]);
   }
 
   function updateSpesifikRow(index: number, data: Partial<{ santriId: string; nominal: string }>) {
@@ -319,14 +336,15 @@ export default function TagihanMasterPage() {
     if (targetType === "SEMUA_SANTRI") return [];
     if (targetType === "GENDER") {
       return [
-        { gender: "L", nominal: Number(nominalL) },
-        { gender: "P", nominal: Number(nominalP) },
+        { gender: "L", nominal: parseNumberInput(nominalL) },
+        { gender: "P", nominal: parseNumberInput(nominalP) },
       ];
     }
     if (targetType === "KELAS") {
-      return kelas.map((k) => ({ kelasId: k.id, nominal: Number(kelasNominal[k.id] || 0) }));
+      return kelas.map((k) => ({ kelasId: k.id, nominal: parseNumberInput(kelasNominal[k.id] || "0") }));
     }
-    return spesifik.map((s) => ({ santriId: s.santriId, nominal: Number(s.nominal) }));
+    if (targetType === "SANTRI_BARU") return [];
+    return spesifik.map((s) => ({ santriId: s.santriId, nominal: parseNumberInput(s.nominal) }));
   }
 
   async function onSubmitMaster(e: FormEvent<HTMLFormElement>) {
@@ -350,13 +368,15 @@ export default function TagihanMasterPage() {
         picPutraUserId: picPutraUserId || null,
         picPutriUserId: picPutriUserId || null,
         picKelas: kelas.map((k) => ({ kelasId: k.id, picUserId: picKelasUser[k.id] || null })),
-        nominalGlobal: targetType === "SEMUA_SANTRI" ? Number(nominalGlobal) : null,
+        nominalGlobal: targetType === "SEMUA_SANTRI" || targetType === "SANTRI_BARU" ? parseNumberInput(nominalGlobal) : null,
         startBulan: selectedKomponen?.tipe === "BULANAN" ? Number(startBulan) : null,
         startTahun: selectedKomponen?.tipe === "BULANAN" ? Number(startTahun) : null,
         endBulan: selectedKomponen?.tipe === "BULANAN" ? Number(endBulan) : null,
         endTahun: selectedKomponen?.tipe === "BULANAN" ? Number(endTahun) : null,
-        tanggalTerbit: selectedKomponen?.tipe === "INSIDENTAL" ? tanggalTerbit : null,
-        jatuhTempo: resolvedJatuhTempo,
+        jatuhTempoHari: targetType === "SANTRI_BARU" ? Number(jatuhTempoHari) : null,
+        tanggalTerbit:
+          selectedKomponen?.tipe !== "BULANAN" && targetType !== "SANTRI_BARU" ? tanggalTerbit : null,
+        jatuhTempo: targetType === "SANTRI_BARU" ? null : resolvedJatuhTempo,
         keterangan,
         details: buildDetails(),
       };
@@ -448,7 +468,7 @@ export default function TagihanMasterPage() {
     <section>
       <h2>Pembuatan Tagihan</h2>
       <p className="hint-text">
-        Bulanan: 1 master untuk rentang start-end bulan. Auto generate tanggal 1 (WIB) bisa ON/OFF.
+        Bulanan: 1 master untuk rentang start-end bulan. Auto generate tanggal 10 (WIB) bisa ON/OFF.
       </p>
 
       <form className="form-grid" onSubmit={onSubmitMaster}>
@@ -474,6 +494,7 @@ export default function TagihanMasterPage() {
           <option value="GENDER">Gender</option>
           <option value="KELAS">Kelas</option>
           <option value="SPESIFIK_SANTRI">Spesifik Santri</option>
+          <option value="SANTRI_BARU">Santri Baru</option>
         </select>
 
         <label className="checkbox-row">
@@ -481,8 +502,13 @@ export default function TagihanMasterPage() {
             type="checkbox"
             checked={autoGenerateEnabled}
             onChange={(e) => setAutoGenerateEnabled(e.target.checked)}
+            disabled={selectedKomponen?.tipe === "INSIDENTAL"}
           />
-          Auto Generate ON (tanggal 1 WIB)
+          {selectedKomponen?.tipe === "INSIDENTAL"
+            ? "Insidental: manual generate"
+            : selectedKomponen?.tipe === "SANTRI_BARU"
+              ? "Auto Apply saat santri baru dibuat"
+              : "Auto Generate ON (tanggal 10 WIB)"}
         </label>
 
         <label htmlFor="picMode">Mode PIC</label>
@@ -540,20 +566,22 @@ export default function TagihanMasterPage() {
           </div>
         ) : null}
 
-        {targetType === "SEMUA_SANTRI" ? (
+        {targetType === "SEMUA_SANTRI" || targetType === "SANTRI_BARU" ? (
           <>
-            <label htmlFor="nominalGlobal">Nominal Semua Santri</label>
-            <input id="nominalGlobal" type="number" min="1" value={nominalGlobal} onChange={(e) => setNominalGlobal(e.target.value)} />
+            <label htmlFor="nominalGlobal">
+              {targetType === "SANTRI_BARU" ? "Nominal Santri Baru" : "Nominal Semua Santri"}
+            </label>
+            <input id="nominalGlobal" inputMode="numeric" value={nominalGlobal} onChange={(e) => setNominalGlobal(formatNumberInput(e.target.value))} />
           </>
         ) : null}
 
         {targetType === "GENDER" ? (
           <>
             <label htmlFor="nominalL">Nominal Putra (L)</label>
-            <input id="nominalL" type="number" min="1" value={nominalL} onChange={(e) => setNominalL(e.target.value)} />
+            <input id="nominalL" inputMode="numeric" value={nominalL} onChange={(e) => setNominalL(formatNumberInput(e.target.value))} />
 
             <label htmlFor="nominalP">Nominal Putri (P)</label>
-            <input id="nominalP" type="number" min="1" value={nominalP} onChange={(e) => setNominalP(e.target.value)} />
+            <input id="nominalP" inputMode="numeric" value={nominalP} onChange={(e) => setNominalP(formatNumberInput(e.target.value))} />
           </>
         ) : null}
 
@@ -564,10 +592,9 @@ export default function TagihanMasterPage() {
               <div key={k.id} className="row-inline">
                 <span>{k.nama}</span>
                 <input
-                  type="number"
-                  min="1"
+                  inputMode="numeric"
                   value={kelasNominal[k.id] || ""}
-                  onChange={(e) => setKelasNominal((prev) => ({ ...prev, [k.id]: e.target.value }))}
+                  onChange={(e) => setKelasNominal((prev) => ({ ...prev, [k.id]: formatNumberInput(e.target.value) }))}
                 />
               </div>
             ))}
@@ -588,10 +615,9 @@ export default function TagihanMasterPage() {
                   ))}
                 </select>
                 <input
-                  type="number"
-                  min="1"
+                  inputMode="numeric"
                   value={item.nominal}
-                  onChange={(e) => updateSpesifikRow(idx, { nominal: e.target.value })}
+                  onChange={(e) => updateSpesifikRow(idx, { nominal: formatNumberInput(e.target.value) })}
                 />
                 <button type="button" className="btn-danger" onClick={() => removeSpesifikRow(idx)}>Hapus</button>
               </div>
@@ -612,15 +638,30 @@ export default function TagihanMasterPage() {
           </>
         ) : null}
 
-        {selectedKomponen?.tipe === "INSIDENTAL" ? (
+        {selectedKomponen?.tipe !== "BULANAN" && targetType !== "SANTRI_BARU" ? (
           <>
             <label htmlFor="tanggalTerbit">Tanggal Terbit</label>
             <input id="tanggalTerbit" type="date" value={tanggalTerbit} onChange={(e) => setTanggalTerbit(e.target.value)} />
           </>
         ) : null}
 
-        <label htmlFor="jatuhTempo">Jatuh Tempo</label>
-        <input id="jatuhTempo" type="date" value={jatuhTempo} onChange={(e) => setJatuhTempo(e.target.value)} />
+        {targetType === "SANTRI_BARU" ? (
+          <>
+            <label htmlFor="jatuhTempoHari">Jatuh Tempo (hari dari pembuatan tagihan)</label>
+            <input
+              id="jatuhTempoHari"
+              type="number"
+              min="1"
+              value={jatuhTempoHari}
+              onChange={(e) => setJatuhTempoHari(e.target.value)}
+            />
+          </>
+        ) : (
+          <>
+            <label htmlFor="jatuhTempo">Jatuh Tempo</label>
+            <input id="jatuhTempo" type="date" value={jatuhTempo} onChange={(e) => setJatuhTempo(e.target.value)} />
+          </>
+        )}
 
         <label htmlFor="keterangan">Keterangan</label>
         <input id="keterangan" value={keterangan} onChange={(e) => setKeterangan(e.target.value)} />
@@ -664,10 +705,10 @@ export default function TagihanMasterPage() {
         {preview ? (
           <div className="stack-block">
             <div className="hint-text">
-              Target: {preview.targetCount} santri | Awal: {preview.totalNominalAwal} | Diskon: {preview.totalDiskon} | Akhir: {preview.totalNominal} | Periode: {preview.periodeKey}
+              Target: {formatNumber(preview.targetCount)} santri | Awal: {formatNumber(preview.totalNominalAwal)} | Diskon: {formatNumber(preview.totalDiskon)} | Akhir: {formatNumber(preview.totalNominal)} | Periode: {preview.periodeKey}
             </div>
             <div className="hint-text">
-              Menampilkan {preview.preview.length} dari {preview.targetCount} calon tagihan (duplikat dilewati: {preview.skippedDuplicateCount})
+              Menampilkan {formatNumber(preview.preview.length)} dari {formatNumber(preview.targetCount)} calon tagihan (duplikat dilewati: {formatNumber(preview.skippedDuplicateCount)})
             </div>
             <div className="table-wrap">
               <table>
@@ -688,10 +729,10 @@ export default function TagihanMasterPage() {
                     <tr key={row.santriId}>
                       <td>{row.nis}</td>
                       <td>{row.nama}</td>
-                      <td>{row.nominalAwal}</td>
-                      <td>{row.persentaseDiskon}</td>
-                      <td>{row.nominalDiskon}</td>
-                      <td>{row.nominalAkhir}</td>
+                      <td>{formatNumber(row.nominalAwal)}</td>
+                      <td>{formatNumber(row.persentaseDiskon)}</td>
+                      <td>{formatNumber(row.nominalDiskon)}</td>
+                      <td>{formatNumber(row.nominalAkhir)}</td>
                       <td>{row.kategoriDiskon ? `${row.kategoriDiskon.kode} - ${row.kategoriDiskon.nama}` : "-"}</td>
                       <td>{row.picUsername || "-"}</td>
                     </tr>
@@ -740,7 +781,9 @@ export default function TagihanMasterPage() {
                 <td>
                   {r.komponen.tipe === "BULANAN"
                     ? `${r.startBulan}/${r.startTahun} - ${r.endBulan}/${r.endTahun}`
-                    : "Insidental"}
+                    : r.komponen.tipe === "SANTRI_BARU"
+                      ? "Santri Baru"
+                      : "Insidental"}
                 </td>
                 <td>{r.lastGeneratedPeriod || "-"}</td>
                 <td>{new Date(r.jatuhTempo).toISOString().slice(0, 10)}</td>

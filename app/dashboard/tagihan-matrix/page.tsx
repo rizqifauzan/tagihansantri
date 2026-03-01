@@ -50,6 +50,7 @@ type MatrixResponse = {
   columns: MatrixColumn[];
   rows: MatrixRow[];
 };
+const formatNumber = (value: number) => value.toLocaleString("id-ID");
 
 const FILTER_OPTIONS: Array<{ value: MatrixFilter; label: string }> = [
   { value: "ALL", label: "Semua Tagihan" },
@@ -171,7 +172,7 @@ export default function TagihanMatrixPage() {
       </div>
 
       <p className="hint-text">
-        Total Santri: {data.totalSantri} | Total Kolom Tagihan: {data.totalKolomTagihan}
+        Total Santri: {formatNumber(data.totalSantri)} | Total Kolom Tagihan: {formatNumber(data.totalKolomTagihan)}
       </p>
       {message ? <p className="error-text">{message}</p> : null}
 
@@ -220,25 +221,25 @@ export default function TagihanMatrixPage() {
                 ))}
                 {data.countView === "SEMUA" ? (
                   <>
-                    <td>{row.countTagihan.toLocaleString("id-ID")}</td>
-                    <td>{row.countSudahDibayar.toLocaleString("id-ID")}</td>
-                    <td>{row.countBelumDibayar.toLocaleString("id-ID")}</td>
+                    <td>{formatNumber(row.countTagihan)}</td>
+                    <td>{formatNumber(row.countSudahDibayar)}</td>
+                    <td>{formatNumber(row.countBelumDibayar)}</td>
                   </>
                 ) : null}
                 {data.countView === "JUMLAH_TAGIHAN" ? (
-                  <td>{row.countTagihan.toLocaleString("id-ID")}</td>
+                  <td>{formatNumber(row.countTagihan)}</td>
                 ) : null}
                 {data.countView === "SUDAH_DIBAYAR" ? (
-                  <td>{row.countSudahDibayar.toLocaleString("id-ID")}</td>
+                  <td>{formatNumber(row.countSudahDibayar)}</td>
                 ) : null}
                 {data.countView === "BELUM_DIBAYAR" ? (
-                  <td>{row.countBelumDibayar.toLocaleString("id-ID")}</td>
+                  <td>{formatNumber(row.countBelumDibayar)}</td>
                 ) : null}
-                <td>{row.totalNominalAwal.toLocaleString("id-ID")}</td>
-                <td>{row.totalNominalDiskon.toLocaleString("id-ID")}</td>
-                <td>{row.totalNominal.toLocaleString("id-ID")}</td>
-                <td>{row.totalTerbayar.toLocaleString("id-ID")}</td>
-                <td>{row.totalSisa.toLocaleString("id-ID")}</td>
+                <td>{formatNumber(row.totalNominalAwal)}</td>
+                <td>{formatNumber(row.totalNominalDiskon)}</td>
+                <td>{formatNumber(row.totalNominal)}</td>
+                <td>{formatNumber(row.totalTerbayar)}</td>
+                <td>{formatNumber(row.totalSisa)}</td>
               </tr>
             ))}
             {!data.rows.length ? (

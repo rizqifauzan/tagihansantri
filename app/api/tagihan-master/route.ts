@@ -1,4 +1,4 @@
-import { Gender, TargetTagihanType } from "@prisma/client";
+import { Gender } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/api-auth";
 import { parsePageQuery, toOptionalDate } from "@/lib/api-utils";
@@ -6,10 +6,17 @@ import { prisma } from "@/lib/prisma";
 import {
   determineMonthlyStatus,
   toDetailCreate,
+  TargetTagihanTypeValue,
   validateMasterInput,
 } from "@/lib/tagihan-master";
 
-const VALID_TARGET = new Set(Object.values(TargetTagihanType));
+const VALID_TARGET = new Set<string>([
+  "SEMUA_SANTRI",
+  "GENDER",
+  "KELAS",
+  "SPESIFIK_SANTRI",
+  "SANTRI_BARU",
+]);
 const VALID_GENDER = new Set(Object.values(Gender));
 const PIC_MODES = ["GLOBAL", "BY_GENDER", "BY_KELAS"] as const;
 type TagihanPicModeValue = (typeof PIC_MODES)[number];
@@ -82,7 +89,7 @@ export async function POST(req: NextRequest) {
   const db = prisma as any;
 
   const body = await req.json();
-  const targetType = String(body?.targetType || "").trim() as TargetTagihanType;
+  const targetType = String(body?.targetType || "").trim() as TargetTagihanTypeValue;
   if (!VALID_TARGET.has(targetType)) {
     return NextResponse.json({ message: "Target type tidak valid" }, { status: 400 });
   }
@@ -111,6 +118,7 @@ export async function POST(req: NextRequest) {
     endBulan: body?.endBulan ? Number(body.endBulan) : null,
     endTahun: body?.endTahun ? Number(body.endTahun) : null,
     autoGenerateEnabled: Boolean(body?.autoGenerateEnabled ?? true),
+    jatuhTempoHari: body?.jatuhTempoHari ? Number(body.jatuhTempoHari) : null,
     picMode: String(body?.picMode || "GLOBAL").trim() as TagihanPicModeValue,
     picGlobalUserId: String(body?.picGlobalUserId || "").trim() || null,
     picPutraUserId: String(body?.picPutraUserId || "").trim() || null,
@@ -127,8 +135,11 @@ export async function POST(req: NextRequest) {
     details,
   };
 
-  if (!input.jatuhTempo) {
+  if (input.targetType !== "SANTRI_BARU" && !input.jatuhTempo) {
     return NextResponse.json({ message: "Jatuh tempo wajib diisi" }, { status: 400 });
+  }
+  if (input.targetType === "SANTRI_BARU" && (!input.jatuhTempoHari || input.jatuhTempoHari < 1)) {
+    return NextResponse.json({ message: "Jatuh tempo hari wajib diisi (minimal 1)" }, { status: 400 });
   }
   if (!VALID_PIC_MODE.has(input.picMode)) {
     return NextResponse.json({ message: "Mode PIC tidak valid" }, { status: 400 });
@@ -158,7 +169,9 @@ export async function POST(req: NextRequest) {
 
   const validationError = await validateMasterInput({
     ...input,
-    jatuhTempo: input.jatuhTempo,
+    jatuhTempo:
+      input.jatuhTempo ||
+      new Date(Date.now() + Number(input.jatuhTempoHari || 30) * 24 * 60 * 60 * 1000),
   });
   if (validationError) {
     return NextResponse.json({ message: validationError }, { status: 400 });
@@ -169,6 +182,7 @@ export async function POST(req: NextRequest) {
     if (!komponen) return NextResponse.json({ message: "Komponen tidak ditemukan" }, { status: 404 });
 
     const now = getWibMonthYear();
+    const effectiveAutoGenerateEnabled = komponen.tipe === "INSIDENTAL" ? false : input.autoGenerateEnabled;
     const status =
       komponen.tipe === "BULANAN"
         ? determineMonthlyStatus({
@@ -178,11 +192,13 @@ export async function POST(req: NextRequest) {
             endTahun: input.endTahun || now.year,
             nowMonth: now.month,
             nowYear: now.year,
-            manualInactive: !input.autoGenerateEnabled,
+            manualInactive: !effectiveAutoGenerateEnabled,
           })
-        : input.autoGenerateEnabled
+        : komponen.tipe === "INSIDENTAL"
           ? "ACTIVE"
-          : "INACTIVE";
+          : effectiveAutoGenerateEnabled
+            ? "ACTIVE"
+            : "INACTIVE";
 
     const created = await db.tagihanMaster.create({
       data: {
@@ -190,7 +206,7 @@ export async function POST(req: NextRequest) {
         namaTagihan: input.namaTagihan,
         targetType: input.targetType,
         status: status as any,
-        autoGenerateEnabled: input.autoGenerateEnabled,
+        autoGenerateEnabled: effectiveAutoGenerateEnabled,
         picMode: input.picMode,
         picGlobalUserId: input.picGlobalUserId,
         picPutraUserId: input.picPutraUserId,
@@ -200,8 +216,11 @@ export async function POST(req: NextRequest) {
         startTahun: input.startTahun,
         endBulan: input.endBulan,
         endTahun: input.endTahun,
-        tanggalTerbit: input.tanggalTerbit,
-        jatuhTempo: input.jatuhTempo,
+        jatuhTempoHari: input.jatuhTempoHari,
+        tanggalTerbit: input.targetType === "SANTRI_BARU" ? null : input.tanggalTerbit,
+        jatuhTempo:
+          input.jatuhTempo ||
+          new Date(Date.now() + Number(input.jatuhTempoHari || 30) * 24 * 60 * 60 * 1000),
         keterangan: input.keterangan,
         picKelas: {
           create: input.picKelas

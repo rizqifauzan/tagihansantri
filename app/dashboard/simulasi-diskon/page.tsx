@@ -1,6 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+const formatNumber = (value: number) => value.toLocaleString("id-ID");
+const parseNumberInput = (value: string) => Number((value || "").replace(/\./g, "")) || 0;
+const formatNumberInput = (value: string) => {
+  const digits = (value || "").replace(/\D/g, "");
+  if (!digits) return "";
+  return Number(digits).toLocaleString("id-ID");
+};
 
 type Option = { id: string; nama: string; nis?: string; kode?: string };
 
@@ -18,7 +25,7 @@ export default function SimulasiDiskonPage() {
   const [komponenOptions, setKomponenOptions] = useState<Option[]>([]);
   const [santriId, setSantriId] = useState("");
   const [komponenId, setKomponenId] = useState("");
-  const [nominalAwal, setNominalAwal] = useState("500000");
+  const [nominalAwal, setNominalAwal] = useState("500.000");
   const [message, setMessage] = useState("");
   const [result, setResult] = useState<SimulasiResult | null>(null);
 
@@ -51,7 +58,7 @@ export default function SimulasiDiskonPage() {
     const res = await fetch("/api/diskon/simulasi", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ santriId, komponenId, nominalAwal: Number(nominalAwal) }),
+      body: JSON.stringify({ santriId, komponenId, nominalAwal: parseNumberInput(nominalAwal) }),
     });
     const json = await res.json();
 
@@ -86,10 +93,9 @@ export default function SimulasiDiskonPage() {
         <label htmlFor="nominalAwal">Nominal Awal</label>
         <input
           id="nominalAwal"
-          type="number"
-          min="1"
+          inputMode="numeric"
           value={nominalAwal}
-          onChange={(e) => setNominalAwal(e.target.value)}
+          onChange={(e) => setNominalAwal(formatNumberInput(e.target.value))}
         />
 
         <div className="row-actions">
@@ -102,10 +108,10 @@ export default function SimulasiDiskonPage() {
       {result ? (
         <div className="form-grid">
           <h3>Hasil Simulasi</h3>
-          <p>Nominal Awal: <strong>{result.nominalAwal}</strong></p>
+          <p>Nominal Awal: <strong>{formatNumber(result.nominalAwal)}</strong></p>
           <p>Persentase Terpilih: <strong>{result.persentaseTerpilih}%</strong></p>
-          <p>Nominal Diskon: <strong>{result.nominalDiskon}</strong></p>
-          <p>Nominal Akhir: <strong>{result.nominalAkhir}</strong></p>
+          <p>Nominal Diskon: <strong>{formatNumber(result.nominalDiskon)}</strong></p>
+          <p>Nominal Akhir: <strong>{formatNumber(result.nominalAkhir)}</strong></p>
           <p>
             Kategori Terpilih: <strong>{result.selectedKategori ? `${result.selectedKategori.kode} - ${result.selectedKategori.nama}` : "Tidak ada"}</strong>
           </p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+const formatNumber = (value: number) => value.toLocaleString("id-ID");
 
 type Row = {
   id: string;
@@ -139,12 +140,12 @@ export default function PembayaranPage() {
                 <td>{row.tagihan.santri.nis} - {row.tagihan.santri.nama}</td>
                 <td>{row.tagihan.komponen.kode} - {row.tagihan.komponen.nama}</td>
                 <td>{row.tagihan.periodeKey}</td>
-                <td>{row.tagihan.nominalAwal}</td>
-                <td>{row.tagihan.nominalDiskon}</td>
-                <td>{row.tagihan.nominal}</td>
-                <td>{row.tagihan.nominalTerbayar}</td>
-                <td>{Math.max(0, row.tagihan.nominal - row.tagihan.nominalTerbayar)}</td>
-                <td>{row.nominal}</td>
+                <td>{formatNumber(row.tagihan.nominalAwal)}</td>
+                <td>{formatNumber(row.tagihan.nominalDiskon)}</td>
+                <td>{formatNumber(row.tagihan.nominal)}</td>
+                <td>{formatNumber(row.tagihan.nominalTerbayar)}</td>
+                <td>{formatNumber(Math.max(0, row.tagihan.nominal - row.tagihan.nominalTerbayar))}</td>
+                <td>{formatNumber(row.nominal)}</td>
                 <td>{row.metode}</td>
                 <td>{row.referensi || "-"}</td>
                 <td>{row.kwitansi?.nomor || "-"}</td>

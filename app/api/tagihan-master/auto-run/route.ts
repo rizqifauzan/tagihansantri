@@ -40,11 +40,11 @@ async function runAutoGenerate(req: NextRequest) {
   }
 
   const now = getWibMonthYear();
-  if (now.day !== 1) {
+  if (now.day !== 10) {
     return NextResponse.json({
       ok: true,
       skipped: true,
-      reason: "Bukan tanggal 1 WIB",
+      reason: "Bukan tanggal 10 WIB",
       wibDate: `${now.year}-${String(now.month).padStart(2, "0")}-${String(now.day).padStart(2, "0")}`,
     });
   }

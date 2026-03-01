@@ -26,6 +26,7 @@ enum Gender {
 enum KomponenTipe {
   BULANAN
   INSIDENTAL
+  SANTRI_BARU
 }
 
 enum DiskonEligibilityRule {
@@ -52,6 +53,7 @@ enum TargetTagihanType {
   GENDER
   KELAS
   SPESIFIK_SANTRI
+  SANTRI_BARU
 }
 
 enum TagihanMasterStatus {
@@ -219,6 +221,7 @@ model TagihanMaster {
   endBulan             Int?
   endTahun             Int?
   lastGeneratedPeriod  String?
+  jatuhTempoHari       Int?
   tanggalTerbit        DateTime?
   jatuhTempo           DateTime
   keterangan           String?

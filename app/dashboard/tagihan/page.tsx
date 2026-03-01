@@ -13,13 +13,20 @@ type Row = {
   jatuhTempo: string;
   status: TagihanStatus;
   santri: { id: string; nis: string; nama: string; kelas: { nama: string } | null };
-  komponen: { id: string; kode: string; nama: string; tipe: "BULANAN" | "INSIDENTAL" };
+  komponen: { id: string; kode: string; nama: string; tipe: "BULANAN" | "INSIDENTAL" | "SANTRI_BARU" };
   master: { id: string; namaTagihan: string | null; targetType: string };
   picUser: { id: string; username: string; active: boolean } | null;
 };
 type UserOption = { id: string; username: string; active: boolean };
 
 const STATUS_OPTIONS: TagihanStatus[] = ["DRAFT", "TERBIT", "SEBAGIAN", "LUNAS", "BATAL"];
+const formatNumber = (value: number) => value.toLocaleString("id-ID");
+const parseNumberInput = (value: string) => Number((value || "").replace(/\./g, "")) || 0;
+const formatNumberInput = (value: string) => {
+  const digits = (value || "").replace(/\D/g, "");
+  if (!digits) return "";
+  return Number(digits).toLocaleString("id-ID");
+};
 
 export default function TagihanPage() {
   const [rows, setRows] = useState<Row[]>([]);
@@ -119,7 +126,7 @@ export default function TagihanPage() {
   function openPaymentForm(row: Row) {
     setPaymentTagihanId(row.id);
     const sisa = Math.max(0, row.nominal - row.nominalTerbayar);
-    setPaymentNominal(String(sisa || row.nominal));
+    setPaymentNominal(formatNumber(sisa || row.nominal));
     setPaymentMetode("TUNAI");
     setPaymentReferensi("");
     setMessage("");
@@ -139,7 +146,7 @@ export default function TagihanPage() {
       return;
     }
 
-    const nominal = Number(paymentNominal);
+    const nominal = parseNumberInput(paymentNominal);
     if (!Number.isFinite(nominal) || nominal <= 0) {
       setMessage("Nominal bayar harus > 0");
       return;
@@ -204,16 +211,15 @@ export default function TagihanPage() {
 
           <label>Tagihan Terpilih</label>
           <div className="hint-text">
-            {selectedPaymentRow.santri.nis} - {selectedPaymentRow.santri.nama} | {selectedPaymentRow.komponen.kode} - {selectedPaymentRow.komponen.nama} | Awal: {selectedPaymentRow.nominalAwal} | Diskon: {selectedPaymentRow.nominalDiskon} | Tagihan: {selectedPaymentRow.nominal} | Sisa: {Math.max(0, selectedPaymentRow.nominal - selectedPaymentRow.nominalTerbayar)}
+            {selectedPaymentRow.santri.nis} - {selectedPaymentRow.santri.nama} | {selectedPaymentRow.komponen.kode} - {selectedPaymentRow.komponen.nama} | Awal: {formatNumber(selectedPaymentRow.nominalAwal)} | Diskon: {formatNumber(selectedPaymentRow.nominalDiskon)} | Tagihan: {formatNumber(selectedPaymentRow.nominal)} | Sisa: {formatNumber(Math.max(0, selectedPaymentRow.nominal - selectedPaymentRow.nominalTerbayar))}
           </div>
 
           <label htmlFor="paymentNominal">Nominal Bayar</label>
           <input
             id="paymentNominal"
-            type="number"
-            min="1"
+            inputMode="numeric"
             value={paymentNominal}
-            onChange={(e) => setPaymentNominal(e.target.value)}
+            onChange={(e) => setPaymentNominal(formatNumberInput(e.target.value))}
             required
           />
 
@@ -260,7 +266,7 @@ export default function TagihanPage() {
                 {group.santri.nis} - {group.santri.nama} ({group.santri.kelas?.nama || "-"})
               </h3>
               <div className="hint-text">
-                Total Awal: {totalNominalAwal} | Total Diskon: {totalNominalDiskon} | Total Tagihan: {totalNominal} | Terbayar: {totalTerbayar} | Sisa: {totalSisa}
+                Total Awal: {formatNumber(totalNominalAwal)} | Total Diskon: {formatNumber(totalNominalDiskon)} | Total Tagihan: {formatNumber(totalNominal)} | Terbayar: {formatNumber(totalTerbayar)} | Sisa: {formatNumber(totalSisa)}
               </div>
               <div className="table-wrap">
                 <table>
@@ -286,11 +292,11 @@ export default function TagihanPage() {
                         <td>{row.komponen.kode} - {row.komponen.nama}</td>
                         <td>{row.master.namaTagihan || "-"}</td>
                         <td>{row.periodeKey}</td>
-                        <td>{row.nominalAwal}</td>
-                        <td>{row.nominalDiskon}</td>
-                        <td>{row.nominal}</td>
-                        <td>{row.nominalTerbayar}</td>
-                        <td>{Math.max(0, row.nominal - row.nominalTerbayar)}</td>
+                        <td>{formatNumber(row.nominalAwal)}</td>
+                        <td>{formatNumber(row.nominalDiskon)}</td>
+                        <td>{formatNumber(row.nominal)}</td>
+                        <td>{formatNumber(row.nominalTerbayar)}</td>
+                        <td>{formatNumber(Math.max(0, row.nominal - row.nominalTerbayar))}</td>
                         <td>{row.status}</td>
                         <td>{new Date(row.jatuhTempo).toISOString().slice(0, 10)}</td>
                         <td>{row.picUser?.username || "-"}</td>

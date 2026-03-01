@@ -1,17 +1,24 @@
-import { Gender, KomponenTipe, SantriStatus, TargetTagihanType } from "@prisma/client";
+import { Gender, KomponenTipe, SantriStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 export type MasterStatus = "SCHEDULED" | "ACTIVE" | "ENDED" | "INACTIVE";
+export type TargetTagihanTypeValue =
+  | "SEMUA_SANTRI"
+  | "GENDER"
+  | "KELAS"
+  | "SPESIFIK_SANTRI"
+  | "SANTRI_BARU";
 
 export type MasterInput = {
   komponenId: string;
   namaTagihan?: string | null;
-  targetType: TargetTagihanType;
+  targetType: TargetTagihanTypeValue;
   nominalGlobal?: number | null;
   startBulan?: number | null;
   startTahun?: number | null;
   endBulan?: number | null;
   endTahun?: number | null;
   autoGenerateEnabled?: boolean;
+  jatuhTempoHari?: number | null;
   tanggalTerbit?: Date | null;
   jatuhTempo: Date;
   keterangan?: string | null;
@@ -124,16 +131,19 @@ export async function validateMasterInput(input: MasterInput): Promise<string | 
       return "Rentang bulan tidak valid (end harus >= start)";
     }
   } else {
-    if (!input.tanggalTerbit || Number.isNaN(input.tanggalTerbit.getTime())) {
+    if (
+      input.targetType !== "SANTRI_BARU" &&
+      (!input.tanggalTerbit || Number.isNaN(input.tanggalTerbit.getTime()))
+    ) {
       return "Tanggal terbit wajib untuk insidental";
     }
   }
 
   switch (input.targetType) {
-    case TargetTagihanType.SEMUA_SANTRI:
+    case "SEMUA_SANTRI":
       if (invalidNominal(input.nominalGlobal)) return "Nominal global wajib > 0";
       break;
-    case TargetTagihanType.GENDER: {
+    case "GENDER": {
       const l = input.details.find((d) => d.gender === Gender.L);
       const p = input.details.find((d) => d.gender === Gender.P);
       if (!l || !p) return "Nominal gender L dan P wajib diisi";
@@ -142,7 +152,7 @@ export async function validateMasterInput(input: MasterInput): Promise<string | 
       }
       break;
     }
-    case TargetTagihanType.KELAS: {
+    case "KELAS": {
       const kelasAktif = await prisma.kelas.findMany({ where: { active: true }, select: { id: true } });
       const setDetail = new Set(input.details.filter((d) => d.kelasId).map((d) => d.kelasId as string));
       const missing = kelasAktif.some((k) => !setDetail.has(k.id));
@@ -150,10 +160,19 @@ export async function validateMasterInput(input: MasterInput): Promise<string | 
       if (input.details.some((d) => invalidNominal(d.nominal))) return "Nominal kelas wajib > 0";
       break;
     }
-    case TargetTagihanType.SPESIFIK_SANTRI:
+    case "SPESIFIK_SANTRI":
       if (!input.details.length) return "Minimal satu santri wajib dipilih";
       if (input.details.some((d) => !d.santriId)) return "Santri target tidak valid";
       if (input.details.some((d) => invalidNominal(d.nominal))) return "Nominal tiap santri wajib > 0";
+      break;
+    case "SANTRI_BARU":
+      if (komponen.tipe !== KomponenTipe.SANTRI_BARU) {
+        return "Target SANTRI_BARU hanya untuk komponen tipe SANTRI_BARU";
+      }
+      if (invalidNominal(input.nominalGlobal)) return "Nominal santri baru wajib > 0";
+      if (!input.jatuhTempoHari || input.jatuhTempoHari < 1) {
+        return "Jatuh tempo hari wajib diisi (minimal 1 hari)";
+      }
       break;
   }
 
@@ -161,7 +180,7 @@ export async function validateMasterInput(input: MasterInput): Promise<string | 
 }
 
 export async function resolveTargetSantri(master: {
-  targetType: TargetTagihanType;
+  targetType: TargetTagihanTypeValue;
   nominalGlobal: number | null;
   details: Array<{ gender: Gender | null; kelasId: string | null; santriId: string | null; nominal: number }>;
   periodMonth?: number | null;
@@ -187,18 +206,22 @@ export async function resolveTargetSantri(master: {
     return keluarMonth === monthlyPeriod.month && keluarYear === monthlyPeriod.year;
   });
 
-  if (master.targetType === TargetTagihanType.SEMUA_SANTRI) {
+  if (master.targetType === "SEMUA_SANTRI") {
     return targetSantri.map((s) => ({ santriId: s.id, nominal: master.nominalGlobal || 0 }));
   }
 
-  if (master.targetType === TargetTagihanType.GENDER) {
+  if (master.targetType === "GENDER") {
     const byGender = new Map(master.details.filter((d) => d.gender).map((d) => [d.gender as Gender, d.nominal]));
     return targetSantri.filter((s) => byGender.has(s.gender)).map((s) => ({ santriId: s.id, nominal: byGender.get(s.gender) || 0 }));
   }
 
-  if (master.targetType === TargetTagihanType.KELAS) {
+  if (master.targetType === "KELAS") {
     const byKelas = new Map(master.details.filter((d) => d.kelasId).map((d) => [d.kelasId as string, d.nominal]));
     return targetSantri.filter((s) => byKelas.has(s.kelasId)).map((s) => ({ santriId: s.id, nominal: byKelas.get(s.kelasId) || 0 }));
+  }
+
+  if (master.targetType === "SANTRI_BARU") {
+    return [];
   }
 
   const bySantri = new Map(master.details.filter((d) => d.santriId).map((d) => [d.santriId as string, d.nominal]));
@@ -218,8 +241,8 @@ export async function existingSantriIdsForPeriod(input: { komponenId: string; pe
   return new Set(existing.map((e: { santriId: string }) => e.santriId));
 }
 
-export function toDetailCreate(targetType: TargetTagihanType, details: MasterInput["details"]) {
-  if (targetType === TargetTagihanType.SEMUA_SANTRI) return [];
+export function toDetailCreate(targetType: TargetTagihanTypeValue, details: MasterInput["details"]) {
+  if (targetType === "SEMUA_SANTRI" || targetType === "SANTRI_BARU") return [];
   return details.map((d) => ({
     gender: d.gender || null,
     kelasId: d.kelasId || null,
