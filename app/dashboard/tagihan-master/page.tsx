@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Card, Modal } from "@/app/dashboard/_components/primitives";
 
 type TargetType = "SEMUA_SANTRI" | "GENDER" | "KELAS" | "SPESIFIK_SANTRI" | "SANTRI_BARU";
 type Status = "SCHEDULED" | "ACTIVE" | "ENDED" | "INACTIVE";
@@ -127,6 +128,7 @@ export default function TagihanMasterPage() {
   const [preview, setPreview] = useState<PreviewRes | null>(null);
   const [confirmGenerate, setConfirmGenerate] = useState(false);
   const [editingId, setEditingId] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
 
   const selectedKomponen = useMemo(
     () => komponen.find((k) => k.id === komponenId) || null,
@@ -297,6 +299,7 @@ export default function TagihanMasterPage() {
 
     setPreview(null);
     setMessage("Mode edit aktif");
+    setFormOpen(true);
   }
 
   async function onDelete(id: string) {
@@ -395,6 +398,7 @@ export default function TagihanMasterPage() {
       }
 
       setMessage(editingId ? "Master tagihan berhasil diperbarui" : "Master tagihan berhasil disimpan");
+      setFormOpen(false);
       resetForm();
       await loadMaster();
     } catch (err) {
@@ -465,12 +469,28 @@ export default function TagihanMasterPage() {
   }
 
   return (
-    <section>
-      <h2>Pembuatan Tagihan</h2>
+    <section className="dashboard-main">
+      <header className="page-head">
+        <div>
+          <h2>Pembuatan Tagihan</h2>
+          <p>Kelola master pembuatan tagihan untuk skenario bulanan, insidental, dan santri baru.</p>
+        </div>
+      </header>
+
+      <Card>
+      <div className="row-actions" style={{ marginBottom: 8 }}>
+        <button type="button" onClick={() => { resetForm(); setFormOpen(true); }}>
+          {editingId ? "Tambah Master" : "Buat Master"}
+        </button>
+      </div>
       <p className="hint-text">
         Bulanan: 1 master untuk rentang start-end bulan. Auto generate tanggal 10 (WIB) bisa ON/OFF.
       </p>
-
+      <Modal
+        open={formOpen}
+        title={editingId ? "Edit Master Tagihan" : "Tambah Master Tagihan"}
+        onClose={() => setFormOpen(false)}
+      >
       <form className="form-grid" onSubmit={onSubmitMaster}>
         <label htmlFor="komponen">Komponen</label>
         <select id="komponen" value={komponenId} onChange={(e) => setKomponenId(e.target.value)}>
@@ -668,11 +688,10 @@ export default function TagihanMasterPage() {
 
         <div className="row-actions">
           <button type="submit" disabled={loading}>{loading ? "Menyimpan..." : editingId ? "Update Master" : "Simpan Master"}</button>
-          {editingId ? (
-            <button type="button" onClick={resetForm} disabled={loading}>Batal Edit</button>
-          ) : null}
+          <button type="button" className="btn-secondary" onClick={() => setFormOpen(false)} disabled={loading}>Batal</button>
         </div>
       </form>
+      </Modal>
 
       {message ? <p className="error-text">{message}</p> : null}
 
@@ -801,6 +820,7 @@ export default function TagihanMasterPage() {
           </tbody>
         </table>
       </div>
+      </Card>
     </section>
   );
 }

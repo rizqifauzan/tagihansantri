@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { Card, Modal } from "@/app/dashboard/_components/primitives";
 
 type Keluarga = {
   id: string;
@@ -28,6 +29,7 @@ export default function KeluargaPage() {
   const [kodeKeluarga, setKodeKeluarga] = useState("");
   const [namaKepalaFamily, setNamaKepalaFamily] = useState("");
   const [keterangan, setKeterangan] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
 
   async function loadData(nextPage = page, keyword = q) {
     setLoading(true);
@@ -59,6 +61,11 @@ export default function KeluargaPage() {
     setKeterangan("");
   }
 
+  function closeForm() {
+    setFormOpen(false);
+    resetForm();
+  }
+
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setMessage("");
@@ -86,6 +93,7 @@ export default function KeluargaPage() {
       return;
     }
 
+    setFormOpen(false);
     resetForm();
     await loadData(page, q);
   }
@@ -104,9 +112,20 @@ export default function KeluargaPage() {
   }
 
   return (
-    <section>
-      <h2>Master Keluarga</h2>
+    <section className="dashboard-main">
+      <header className="page-head">
+        <div>
+          <h2>Data Wali</h2>
+          <p>Kelola data keluarga/wali santri untuk kebutuhan relasi tagihan.</p>
+        </div>
+      </header>
 
+      <Card>
+      <div className="row-actions" style={{ marginBottom: 8 }}>
+        <button type="button" onClick={() => { resetForm(); setFormOpen(true); }}>
+          Tambah Wali
+        </button>
+      </div>
       <form className="toolbar" onSubmit={(e) => { e.preventDefault(); loadData(1, q); }}>
         <input
           value={q}
@@ -114,28 +133,6 @@ export default function KeluargaPage() {
           placeholder="Cari kode keluarga / kepala keluarga"
         />
         <button type="submit">Cari</button>
-      </form>
-
-      <form className="form-grid" onSubmit={onSubmit}>
-        <h3>{formId ? "Edit Keluarga" : "Tambah Keluarga"}</h3>
-
-        <label htmlFor="kodeKeluarga">Kode Keluarga</label>
-        <input id="kodeKeluarga" value={kodeKeluarga} onChange={(e) => setKodeKeluarga(e.target.value)} />
-
-        <label htmlFor="namaKepalaFamily">Nama Kepala Keluarga</label>
-        <input
-          id="namaKepalaFamily"
-          value={namaKepalaFamily}
-          onChange={(e) => setNamaKepalaFamily(e.target.value)}
-        />
-
-        <label htmlFor="keterangan">Keterangan</label>
-        <input id="keterangan" value={keterangan} onChange={(e) => setKeterangan(e.target.value)} />
-
-        <div className="row-actions">
-          <button type="submit">{formId ? "Update" : "Simpan"}</button>
-          {formId ? <button type="button" className="btn-secondary" onClick={resetForm}>Batal</button> : null}
-        </div>
       </form>
 
       {message ? <p className="error-text">{message}</p> : null}
@@ -163,6 +160,7 @@ export default function KeluargaPage() {
                       setKodeKeluarga(row.kodeKeluarga);
                       setNamaKepalaFamily(row.namaKepalaFamily || "");
                       setKeterangan(row.keterangan || "");
+                      setFormOpen(true);
                     }}>Edit</button>
                     <button type="button" className="btn-danger" onClick={() => onDelete(row.id)}>Hapus</button>
                   </div>
@@ -179,6 +177,34 @@ export default function KeluargaPage() {
         <span>Halaman {page} / {totalPages}</span>
         <button type="button" disabled={page >= totalPages} onClick={() => loadData(page + 1, q)}>Berikutnya</button>
       </div>
+      </Card>
+
+      <Modal
+        open={formOpen}
+        title={formId ? "Edit Wali" : "Tambah Wali"}
+        onClose={closeForm}
+        footer={(
+          <>
+            <button type="submit" form="keluarga-form">{formId ? "Update" : "Simpan"}</button>
+            <button type="button" className="btn-secondary" onClick={closeForm}>Batal</button>
+          </>
+        )}
+      >
+        <form id="keluarga-form" className="form-grid" onSubmit={onSubmit}>
+          <label htmlFor="kodeKeluarga">Kode Keluarga</label>
+          <input id="kodeKeluarga" value={kodeKeluarga} onChange={(e) => setKodeKeluarga(e.target.value)} />
+
+          <label htmlFor="namaKepalaFamily">Nama Kepala Keluarga</label>
+          <input
+            id="namaKepalaFamily"
+            value={namaKepalaFamily}
+            onChange={(e) => setNamaKepalaFamily(e.target.value)}
+          />
+
+          <label htmlFor="keterangan">Keterangan</label>
+          <input id="keterangan" value={keterangan} onChange={(e) => setKeterangan(e.target.value)} />
+        </form>
+      </Modal>
     </section>
   );
 }

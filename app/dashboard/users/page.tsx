@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { Card, Modal } from "@/app/dashboard/_components/primitives";
 
 type UserRow = {
   id: string;
@@ -33,6 +34,7 @@ export default function UsersPage() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"ADMIN">("ADMIN");
   const [active, setActive] = useState(true);
+  const [formOpen, setFormOpen] = useState(false);
 
   async function loadData(nextPage = page, keyword = q) {
     setLoading(true);
@@ -73,6 +75,11 @@ export default function UsersPage() {
     setActive(true);
   }
 
+  function closeForm() {
+    setFormOpen(false);
+    resetForm();
+  }
+
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setMessage("");
@@ -104,6 +111,7 @@ export default function UsersPage() {
       return;
     }
 
+    setFormOpen(false);
     resetForm();
     await loadData(page, q);
   }
@@ -122,9 +130,20 @@ export default function UsersPage() {
   }
 
   return (
-    <section>
-      <h2>Manajemen User</h2>
+    <section className="dashboard-main">
+      <header className="page-head">
+        <div>
+          <h2>Hak Akses</h2>
+          <p>Kelola akun admin sistem untuk operasional keuangan pesantren.</p>
+        </div>
+      </header>
 
+      <Card>
+      <div className="row-actions" style={{ marginBottom: 8 }}>
+        <button type="button" onClick={() => { resetForm(); setFormOpen(true); }}>
+          Tambah User
+        </button>
+      </div>
       <form
         className="toolbar"
         onSubmit={(e) => {
@@ -139,53 +158,6 @@ export default function UsersPage() {
           onChange={(e) => setQ(e.target.value)}
         />
         <button type="submit">Cari</button>
-      </form>
-
-      <form className="form-grid" onSubmit={onSubmit}>
-        <h3>{formId ? "Edit User" : "Tambah User"}</h3>
-
-        <label htmlFor="username">Username</label>
-        <input
-          id="username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          required
-        />
-
-        <label htmlFor="password">
-          Password {formId ? "(kosongkan jika tidak diubah)" : ""}
-        </label>
-        <input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder={formId ? "Kosongkan jika tidak diubah" : ""}
-          required={!formId}
-        />
-
-        <label htmlFor="role">Role</label>
-        <select id="role" value={role} onChange={(e) => setRole(e.target.value as "ADMIN")}>
-          <option value="ADMIN">ADMIN</option>
-        </select>
-
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={active}
-            onChange={(e) => setActive(e.target.checked)}
-          />
-          Aktif
-        </label>
-
-        <div className="row-actions">
-          <button type="submit">{formId ? "Update" : "Simpan"}</button>
-          {formId ? (
-            <button type="button" onClick={resetForm} className="btn-secondary">
-              Batal
-            </button>
-          ) : null}
-        </div>
       </form>
 
       {message ? <p className="error-text">{message}</p> : null}
@@ -218,6 +190,7 @@ export default function UsersPage() {
                         setPassword("");
                         setRole("ADMIN");
                         setActive(row.active);
+                        setFormOpen(true);
                       }}
                     >
                       Edit
@@ -253,6 +226,55 @@ export default function UsersPage() {
           Berikutnya
         </button>
       </div>
+      </Card>
+
+      <Modal
+        open={formOpen}
+        title={formId ? "Edit User" : "Tambah User"}
+        onClose={closeForm}
+        footer={(
+          <>
+            <button type="submit" form="user-form">{formId ? "Update" : "Simpan"}</button>
+            <button type="button" onClick={closeForm} className="btn-secondary">Batal</button>
+          </>
+        )}
+      >
+        <form id="user-form" className="form-grid" onSubmit={onSubmit}>
+          <label htmlFor="username">Username</label>
+          <input
+            id="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+          />
+
+          <label htmlFor="password">
+            Password {formId ? "(kosongkan jika tidak diubah)" : ""}
+          </label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={formId ? "Kosongkan jika tidak diubah" : ""}
+            required={!formId}
+          />
+
+          <label htmlFor="role">Role</label>
+          <select id="role" value={role} onChange={(e) => setRole(e.target.value as "ADMIN")}>
+            <option value="ADMIN">ADMIN</option>
+          </select>
+
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={active}
+              onChange={(e) => setActive(e.target.checked)}
+            />
+            Aktif
+          </label>
+        </form>
+      </Modal>
     </section>
   );
 }

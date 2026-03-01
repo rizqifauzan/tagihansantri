@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { Card, Modal } from "@/app/dashboard/_components/primitives";
 
 type Rule = "NONE" | "SIBLING_FAMILY" | "SANTRI_YATIM" | "SANTRI_KELUARGA_NDALEM";
 
@@ -31,6 +32,7 @@ export default function DiskonKategoriPage() {
   const [eligibilityRule, setEligibilityRule] = useState<Rule>("SIBLING_FAMILY");
   const [siblingCountMin, setSiblingCountMin] = useState("2");
   const [active, setActive] = useState(true);
+  const [formOpen, setFormOpen] = useState(false);
 
   async function loadData(nextPage = page, keyword = q) {
     const params = new URLSearchParams({ page: String(nextPage), pageSize: "10", q: keyword });
@@ -60,6 +62,11 @@ export default function DiskonKategoriPage() {
     setActive(true);
   }
 
+  function closeForm() {
+    setFormOpen(false);
+    resetForm();
+  }
+
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setMessage("");
@@ -85,6 +92,7 @@ export default function DiskonKategoriPage() {
       return;
     }
 
+    setFormOpen(false);
     resetForm();
     await loadData(page, q);
   }
@@ -102,52 +110,23 @@ export default function DiskonKategoriPage() {
   }
 
   return (
-    <section>
-      <h2>Kategori Diskon</h2>
+    <section className="dashboard-main">
+      <header className="page-head">
+        <div>
+          <h2>Kategori Diskon</h2>
+          <p>Atur kategori dan eligibility diskon agar kebijakan potongan tetap terstruktur.</p>
+        </div>
+      </header>
 
+      <Card>
+      <div className="row-actions" style={{ marginBottom: 8 }}>
+        <button type="button" onClick={() => { resetForm(); setFormOpen(true); }}>
+          Tambah Kategori
+        </button>
+      </div>
       <form className="toolbar" onSubmit={(e) => { e.preventDefault(); loadData(1, q); }}>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari kode / nama kategori" />
         <button type="submit">Cari</button>
-      </form>
-
-      <form className="form-grid" onSubmit={onSubmit}>
-        <h3>{formId ? "Edit Kategori" : "Tambah Kategori"}</h3>
-
-        <label htmlFor="kode">Kode</label>
-        <input id="kode" value={kode} onChange={(e) => setKode(e.target.value)} required />
-
-        <label htmlFor="nama">Nama</label>
-        <input id="nama" value={nama} onChange={(e) => setNama(e.target.value)} required />
-
-        <label htmlFor="rule">Eligibility Rule</label>
-        <select id="rule" value={eligibilityRule} onChange={(e) => setEligibilityRule(e.target.value as Rule)}>
-          {RULE_OPTIONS.map((rule) => <option key={rule} value={rule}>{rule}</option>)}
-        </select>
-
-        {eligibilityRule === "SIBLING_FAMILY" ? (
-          <>
-            <label htmlFor="siblingCountMin">Jumlah Saudara Minimal</label>
-            <select
-              id="siblingCountMin"
-              value={siblingCountMin}
-              onChange={(e) => setSiblingCountMin(e.target.value)}
-            >
-              <option value="2">2 Bersaudara</option>
-              <option value="3">3 Bersaudara</option>
-              <option value="4">4 Bersaudara atau Lebih</option>
-            </select>
-          </>
-        ) : null}
-
-        <label className="checkbox-row">
-          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-          Aktif
-        </label>
-
-        <div className="row-actions">
-          <button type="submit">{formId ? "Update" : "Simpan"}</button>
-          {formId ? <button type="button" className="btn-secondary" onClick={resetForm}>Batal</button> : null}
-        </div>
       </form>
 
       {message ? <p className="error-text">{message}</p> : null}
@@ -183,6 +162,7 @@ export default function DiskonKategoriPage() {
                       setEligibilityRule(row.eligibilityRule);
                       setSiblingCountMin(String(row.siblingCountMin || 2));
                       setActive(row.active);
+                      setFormOpen(true);
                     }}>Edit</button>
                     <button type="button" className="btn-danger" onClick={() => onDelete(row.id)}>Hapus</button>
                   </div>
@@ -199,6 +179,52 @@ export default function DiskonKategoriPage() {
         <span>Halaman {page} / {totalPages}</span>
         <button type="button" disabled={page >= totalPages} onClick={() => loadData(page + 1, q)}>Berikutnya</button>
       </div>
+      </Card>
+
+      <Modal
+        open={formOpen}
+        title={formId ? "Edit Kategori" : "Tambah Kategori"}
+        onClose={closeForm}
+        footer={(
+          <>
+            <button type="submit" form="diskon-kategori-form">{formId ? "Update" : "Simpan"}</button>
+            <button type="button" className="btn-secondary" onClick={closeForm}>Batal</button>
+          </>
+        )}
+      >
+        <form id="diskon-kategori-form" className="form-grid" onSubmit={onSubmit}>
+          <label htmlFor="kode">Kode</label>
+          <input id="kode" value={kode} onChange={(e) => setKode(e.target.value)} required />
+
+          <label htmlFor="nama">Nama</label>
+          <input id="nama" value={nama} onChange={(e) => setNama(e.target.value)} required />
+
+          <label htmlFor="rule">Eligibility Rule</label>
+          <select id="rule" value={eligibilityRule} onChange={(e) => setEligibilityRule(e.target.value as Rule)}>
+            {RULE_OPTIONS.map((rule) => <option key={rule} value={rule}>{rule}</option>)}
+          </select>
+
+          {eligibilityRule === "SIBLING_FAMILY" ? (
+            <>
+              <label htmlFor="siblingCountMin">Jumlah Saudara Minimal</label>
+              <select
+                id="siblingCountMin"
+                value={siblingCountMin}
+                onChange={(e) => setSiblingCountMin(e.target.value)}
+              >
+                <option value="2">2 Bersaudara</option>
+                <option value="3">3 Bersaudara</option>
+                <option value="4">4 Bersaudara atau Lebih</option>
+              </select>
+            </>
+          ) : null}
+
+          <label className="checkbox-row">
+            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+            Aktif
+          </label>
+        </form>
+      </Modal>
     </section>
   );
 }
