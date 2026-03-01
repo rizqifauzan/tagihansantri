@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Card, EmptyState, Popover } from "@/app/dashboard/_components/primitives";
+import { useToast } from "@/app/dashboard/_components/toast";
+
 const formatNumber = (value: number) => value.toLocaleString("id-ID");
 
 type Row = {
@@ -25,6 +28,8 @@ type Row = {
 };
 type UserOption = { id: string; username: string; active: boolean };
 
+type SortKey = "tanggal" | "nominal" | "santri";
+
 export default function PembayaranPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [q, setQ] = useState("");
@@ -33,12 +38,16 @@ export default function PembayaranPage() {
   const [picUserId, setPicUserId] = useState("");
   const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
   const [receiptHtml, setReceiptHtml] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [compactMode, setCompactMode] = useState(false);
+  const [sortBy, setSortBy] = useState<SortKey>("tanggal");
+  const [sortAsc, setSortAsc] = useState(false);
+
+  const { pushToast } = useToast();
 
   async function loadData(nextPage = page) {
     setLoading(true);
-    setMessage("");
     try {
       const params = new URLSearchParams();
       params.set("page", String(nextPage));
@@ -53,8 +62,9 @@ export default function PembayaranPage() {
       setRows(json.data);
       setPage(json.page);
       setTotalPages(json.totalPages);
+      setSelectedIds([]);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Terjadi kesalahan");
+      pushToast(err instanceof Error ? err.message : "Terjadi kesalahan", "error");
     } finally {
       setLoading(false);
     }
@@ -74,109 +84,172 @@ export default function PembayaranPage() {
 
   async function previewKwitansi(pembayaranId: string, template: "RINGKAS" | "LENGKAP") {
     setLoading(true);
-    setMessage("");
     try {
       const res = await fetch(`/api/pembayaran/${pembayaranId}/kwitansi?template=${template}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "Gagal memuat kwitansi");
       setReceiptHtml(json.html || "");
+      pushToast(`Preview kwitansi ${template.toLowerCase()} dimuat`, "success");
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Terjadi kesalahan");
+      pushToast(err instanceof Error ? err.message : "Terjadi kesalahan", "error");
     } finally {
       setLoading(false);
     }
   }
 
+  const processedRows = useMemo(() => {
+    return [...rows].sort((a, b) => {
+      const dir = sortAsc ? 1 : -1;
+      if (sortBy === "tanggal") {
+        return (new Date(a.tanggalBayar).getTime() - new Date(b.tanggalBayar).getTime()) * dir;
+      }
+      if (sortBy === "nominal") {
+        return (a.nominal - b.nominal) * dir;
+      }
+      return a.tagihan.santri.nama.localeCompare(b.tagihan.santri.nama) * dir;
+    });
+  }, [rows, sortAsc, sortBy]);
+
+  const allChecked = processedRows.length > 0 && processedRows.every((row) => selectedIds.includes(row.id));
+
+  function toggleCheckAll() {
+    if (allChecked) {
+      setSelectedIds([]);
+      return;
+    }
+    setSelectedIds(processedRows.map((row) => row.id));
+  }
+
+  function toggleCheck(id: string) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  }
+
   return (
-    <section>
-      <h2>Pembayaran & Kwitansi</h2>
-      <p className="hint-text">
-        Mendukung pembayaran tunai/transfer, cicilan multi-transaksi, dan template kwitansi ringkas/lengkap.
-      </p>
+    <section className="dashboard-main">
+      <header className="page-head">
+        <div>
+          <h2>Pembayaran</h2>
+          <p>Riwayat transaksi, cicilan, dan preview kwitansi dalam satu tampilan ringkas.</p>
+        </div>
+      </header>
 
-      <div className="row-inline">
-        <input
-          placeholder="Cari santri/komponen/nomor kwitansi/referensi"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-        <select value={picUserId} onChange={(e) => setPicUserId(e.target.value)}>
-          <option value="">Semua PIC</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>{u.username}</option>
-          ))}
-        </select>
-        <button type="button" onClick={() => loadData(1)} disabled={loading}>Cari</button>
-      </div>
+      <Card>
+        <div className="toolbar-row">
+          <div className="toolbar">
+            <input
+              placeholder="Cari santri/komponen/nomor kwitansi/referensi"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <select value={picUserId} onChange={(e) => setPicUserId(e.target.value)}>
+              <option value="">Semua PIC</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>{u.username}</option>
+              ))}
+            </select>
+            <button type="button" onClick={() => loadData(1)} disabled={loading}>Cari</button>
+          </div>
 
-      {message ? <p className="error-text">{message}</p> : null}
+          <Popover triggerLabel="Tampilan">
+            <label className="checkbox-row compact-row">
+              <input
+                type="checkbox"
+                checked={compactMode}
+                onChange={(e) => setCompactMode(e.target.checked)}
+              />
+              Mode kompak
+            </label>
+          </Popover>
+        </div>
 
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Tanggal</th>
-              <th>Santri</th>
-              <th>Komponen</th>
-              <th>Periode</th>
-              <th>Nominal Tagihan Awal</th>
-              <th>Nominal Diskon</th>
-              <th>Nominal Tagihan</th>
-              <th>Nominal Terbayar</th>
-              <th>Nominal Belum Dibayar</th>
-              <th>Nominal Pembayaran</th>
-              <th>Metode</th>
-              <th>Referensi</th>
-              <th>Kwitansi</th>
-              <th>PIC</th>
-              <th>Admin</th>
-              <th>Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id}>
-                <td>{new Date(row.tanggalBayar).toISOString().slice(0, 10)}</td>
-                <td>{row.tagihan.santri.nis} - {row.tagihan.santri.nama}</td>
-                <td>{row.tagihan.komponen.kode} - {row.tagihan.komponen.nama}</td>
-                <td>{row.tagihan.periodeKey}</td>
-                <td>{formatNumber(row.tagihan.nominalAwal)}</td>
-                <td>{formatNumber(row.tagihan.nominalDiskon)}</td>
-                <td>{formatNumber(row.tagihan.nominal)}</td>
-                <td>{formatNumber(row.tagihan.nominalTerbayar)}</td>
-                <td>{formatNumber(Math.max(0, row.tagihan.nominal - row.tagihan.nominalTerbayar))}</td>
-                <td>{formatNumber(row.nominal)}</td>
-                <td>{row.metode}</td>
-                <td>{row.referensi || "-"}</td>
-                <td>{row.kwitansi?.nomor || "-"}</td>
-                <td>{row.tagihan.picUser?.username || "-"}</td>
-                <td>{row.adminUsername}</td>
-                <td>
-                  <div className="row-actions">
-                    <button type="button" onClick={() => previewKwitansi(row.id, "RINGKAS")} disabled={loading}>Ringkas</button>
-                    <button type="button" onClick={() => previewKwitansi(row.id, "LENGKAP")} disabled={loading}>Lengkap</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {!rows.length ? (
-              <tr><td colSpan={16}>Belum ada transaksi pembayaran</td></tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+        {selectedIds.length ? (
+          <div className="bulk-bar">
+            <span>{selectedIds.length} pembayaran dipilih</span>
+            <button type="button" className="btn-secondary" onClick={() => setSelectedIds([])}>Reset Pilihan</button>
+          </div>
+        ) : null}
 
-      <div className="row-actions">
-        <button type="button" disabled={loading || page <= 1} onClick={() => loadData(page - 1)}>Prev</button>
-        <span>Page {page} / {totalPages}</span>
-        <button type="button" disabled={loading || page >= totalPages} onClick={() => loadData(page + 1)}>Next</button>
-      </div>
+        {!processedRows.length ? (
+          <EmptyState
+            title="Belum ada transaksi"
+            description="Transaksi pembayaran akan muncul setelah admin mencatat pembayaran pada menu tagihan."
+            cta="Muat Ulang"
+            onAction={() => loadData(1)}
+          />
+        ) : (
+          <div className="table-wrap">
+            <table className={compactMode ? "table-compact" : ""}>
+              <thead>
+                <tr>
+                  <th>
+                    <input type="checkbox" checked={allChecked} onChange={toggleCheckAll} aria-label="Pilih semua" />
+                  </th>
+                  <th>
+                    <button type="button" className="th-sort" onClick={() => { setSortBy("tanggal"); setSortAsc((s) => sortBy === "tanggal" ? !s : false); }}>
+                      Tanggal
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className="th-sort" onClick={() => { setSortBy("santri"); setSortAsc((s) => sortBy === "santri" ? !s : true); }}>
+                      Santri
+                    </button>
+                  </th>
+                  <th>Komponen</th>
+                  <th>Periode</th>
+                  <th>
+                    <button type="button" className="th-sort" onClick={() => { setSortBy("nominal"); setSortAsc((s) => sortBy === "nominal" ? !s : false); }}>
+                      Nominal
+                    </button>
+                  </th>
+                  <th>Metode</th>
+                  <th>Kwitansi</th>
+                  <th>PIC</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {processedRows.map((row) => (
+                  <tr key={row.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(row.id)}
+                        onChange={() => toggleCheck(row.id)}
+                        aria-label={`Pilih pembayaran ${row.id}`}
+                      />
+                    </td>
+                    <td>{new Date(row.tanggalBayar).toISOString().slice(0, 10)}</td>
+                    <td>{row.tagihan.santri.nis} - {row.tagihan.santri.nama}</td>
+                    <td>{row.tagihan.komponen.kode} - {row.tagihan.komponen.nama}</td>
+                    <td>{row.tagihan.periodeKey}</td>
+                    <td>{formatNumber(row.nominal)}</td>
+                    <td>{row.metode}</td>
+                    <td>{row.kwitansi?.nomor || "-"}</td>
+                    <td>{row.tagihan.picUser?.username || "-"}</td>
+                    <td>
+                      <div className="row-actions">
+                        <button type="button" className="btn-secondary" onClick={() => previewKwitansi(row.id, "RINGKAS")} disabled={loading}>Ringkas</button>
+                        <button type="button" onClick={() => previewKwitansi(row.id, "LENGKAP")} disabled={loading}>Lengkap</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="pagination">
+          <button type="button" disabled={loading || page <= 1} onClick={() => loadData(page - 1)}>Prev</button>
+          <span>Page {page} / {totalPages}</span>
+          <button type="button" disabled={loading || page >= totalPages} onClick={() => loadData(page + 1)}>Next</button>
+        </div>
+      </Card>
 
       {receiptHtml ? (
-        <div className="stack-block">
-          <h3>Preview Kwitansi</h3>
-          <div className="table-wrap" dangerouslySetInnerHTML={{ __html: receiptHtml }} />
-        </div>
+        <Card title="Preview Kwitansi" subtitle="Auto-generated dari endpoint yang sama">
+          <div className="receipt-preview" dangerouslySetInnerHTML={{ __html: receiptHtml }} />
+        </Card>
       ) : null}
     </section>
   );

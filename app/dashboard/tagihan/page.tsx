@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Card, EmptyState, Modal, Popover, Tabs } from "@/app/dashboard/_components/primitives";
+import { useToast } from "@/app/dashboard/_components/toast";
 
 type TagihanStatus = "DRAFT" | "TERBIT" | "SEBAGIAN" | "LUNAS" | "BATAL";
 type Row = {
@@ -30,7 +32,6 @@ const formatNumberInput = (value: string) => {
 
 export default function TagihanPage() {
   const [rows, setRows] = useState<Row[]>([]);
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
@@ -38,36 +39,26 @@ export default function TagihanPage() {
   const [users, setUsers] = useState<UserOption[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [tab, setTab] = useState("SEMUA");
+  const [compactMode, setCompactMode] = useState(false);
+
+  const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentTagihanId, setPaymentTagihanId] = useState("");
   const [paymentNominal, setPaymentNominal] = useState("");
   const [paymentMetode, setPaymentMetode] = useState<"TUNAI" | "TRANSFER">("TUNAI");
   const [paymentReferensi, setPaymentReferensi] = useState("");
 
+  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing] = useState<Row | null>(null);
+  const [nextStatus, setNextStatus] = useState<TagihanStatus>("TERBIT");
+
+  const { pushToast } = useToast();
+
   const selectedPaymentRow = rows.find((r) => r.id === paymentTagihanId) || null;
-  const groupedRows = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        santri: Row["santri"];
-        items: Row[];
-      }
-    >();
-
-    for (const row of rows) {
-      const existing = map.get(row.santri.id);
-      if (existing) {
-        existing.items.push(row);
-      } else {
-        map.set(row.santri.id, { santri: row.santri, items: [row] });
-      }
-    }
-
-    return Array.from(map.values());
-  }, [rows]);
 
   async function loadData(nextPage = page) {
     setLoading(true);
-    setMessage("");
 
     try {
       const params = new URLSearchParams();
@@ -84,8 +75,9 @@ export default function TagihanPage() {
       setRows(json.data);
       setPage(json.page);
       setTotalPages(json.totalPages);
+      setSelectedIds([]);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Terjadi kesalahan");
+      pushToast(err instanceof Error ? err.message : "Terjadi kesalahan", "error");
     } finally {
       setLoading(false);
     }
@@ -103,23 +95,34 @@ export default function TagihanPage() {
       .catch(() => undefined);
   }, []);
 
-  async function updateStatus(id: string, nextStatus: TagihanStatus) {
-    setLoading(true);
-    setMessage("");
+  function openEditModal(row: Row) {
+    setEditing(row);
+    setNextStatus(row.status);
+    setEditOpen(true);
+  }
+
+  async function submitEditStatus(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!editing) return;
+
+    const prevRows = rows;
+    setRows((current) => current.map((row) => (row.id === editing.id ? { ...row, status: nextStatus } : row)));
+
     try {
-      const res = await fetch(`/api/tagihan/${id}/status`, {
+      const res = await fetch(`/api/tagihan/${editing.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "Gagal update status");
-      setMessage(`Status tagihan diubah ke ${nextStatus}`);
-      await loadData(page);
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Terjadi kesalahan");
-    } finally {
-      setLoading(false);
+
+      pushToast(`Status tagihan diubah ke ${nextStatus}`, "success");
+      setEditOpen(false);
+      setEditing(null);
+    } catch (error) {
+      setRows(prevRows);
+      pushToast(error instanceof Error ? error.message : "Terjadi kesalahan", "error");
     }
   }
 
@@ -129,7 +132,7 @@ export default function TagihanPage() {
     setPaymentNominal(formatNumber(sisa || row.nominal));
     setPaymentMetode("TUNAI");
     setPaymentReferensi("");
-    setMessage("");
+    setPaymentOpen(true);
   }
 
   function resetPaymentForm() {
@@ -137,27 +140,27 @@ export default function TagihanPage() {
     setPaymentNominal("");
     setPaymentMetode("TUNAI");
     setPaymentReferensi("");
+    setPaymentOpen(false);
   }
 
   async function bayarTagihan(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!paymentTagihanId) {
-      setMessage("Pilih tagihan dulu");
+      pushToast("Pilih tagihan dulu", "warning");
       return;
     }
 
     const nominal = parseNumberInput(paymentNominal);
     if (!Number.isFinite(nominal) || nominal <= 0) {
-      setMessage("Nominal bayar harus > 0");
+      pushToast("Nominal bayar harus > 0", "warning");
       return;
     }
     if (paymentMetode === "TRANSFER" && !paymentReferensi.trim()) {
-      setMessage("Referensi transfer wajib diisi");
+      pushToast("Referensi transfer wajib diisi", "warning");
       return;
     }
 
     setLoading(true);
-    setMessage("");
     try {
       const res = await fetch(`/api/tagihan/${paymentTagihanId}/pembayaran`, {
         method: "POST",
@@ -167,52 +170,209 @@ export default function TagihanPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "Gagal menyimpan pembayaran");
       const nomor = json?.kwitansi?.nomor ? ` | Kwitansi: ${json.kwitansi.nomor}` : "";
-      setMessage(`Pembayaran berhasil disimpan${nomor}`);
+      pushToast(`Pembayaran tersimpan${nomor}`, "success");
       resetPaymentForm();
       await loadData(page);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Terjadi kesalahan");
+      pushToast(err instanceof Error ? err.message : "Terjadi kesalahan", "error");
     } finally {
       setLoading(false);
     }
   }
 
+  const filteredRows = useMemo(() => {
+    if (tab === "LUNAS") return rows.filter((row) => row.status === "LUNAS");
+    if (tab === "TUNGGAKAN") return rows.filter((row) => row.status === "TERBIT" || row.status === "SEBAGIAN");
+    return rows;
+  }, [rows, tab]);
+
+  const allChecked = filteredRows.length > 0 && filteredRows.every((row) => selectedIds.includes(row.id));
+
+  function toggleCheckAll() {
+    if (allChecked) {
+      setSelectedIds([]);
+      return;
+    }
+    setSelectedIds(filteredRows.map((row) => row.id));
+  }
+
+  function toggleCheck(id: string) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  }
+
   return (
-    <section>
-      <h2>Tagihan per Santri</h2>
-      <p className="hint-text">
-        Lifecycle status: DRAFT, TERBIT, SEBAGIAN, LUNAS, BATAL.
-      </p>
+    <section className="dashboard-main">
+      <header className="page-head">
+        <div>
+          <h2>Tagihan Santri</h2>
+          <p>Monitor status lifecycle tagihan dan proses pembayaran tanpa layar yang padat.</p>
+        </div>
+      </header>
 
-      <div className="row-inline">
-        <input
-          placeholder="Cari NIS/Nama Santri/Komponen"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-        <select value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">Semua Status</option>
-          {STATUS_OPTIONS.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-        <select value={picUserId} onChange={(e) => setPicUserId(e.target.value)}>
-          <option value="">Semua PIC</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>{u.username}</option>
-          ))}
-        </select>
-        <button type="button" onClick={() => loadData(1)} disabled={loading}>Filter</button>
-      </div>
-
-      {selectedPaymentRow ? (
-        <form className="form-grid" onSubmit={bayarTagihan}>
-          <h3>Form Pembayaran</h3>
-
-          <label>Tagihan Terpilih</label>
-          <div className="hint-text">
-            {selectedPaymentRow.santri.nis} - {selectedPaymentRow.santri.nama} | {selectedPaymentRow.komponen.kode} - {selectedPaymentRow.komponen.nama} | Awal: {formatNumber(selectedPaymentRow.nominalAwal)} | Diskon: {formatNumber(selectedPaymentRow.nominalDiskon)} | Tagihan: {formatNumber(selectedPaymentRow.nominal)} | Sisa: {formatNumber(Math.max(0, selectedPaymentRow.nominal - selectedPaymentRow.nominalTerbayar))}
+      <Card>
+        <div className="toolbar-row">
+          <div className="toolbar">
+            <input
+              placeholder="Cari NIS/Nama Santri/Komponen"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="">Semua Status</option>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <select value={picUserId} onChange={(e) => setPicUserId(e.target.value)}>
+              <option value="">Semua PIC</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>{u.username}</option>
+              ))}
+            </select>
+            <button type="button" onClick={() => loadData(1)} disabled={loading}>Filter</button>
           </div>
+
+          <div className="toolbar-actions">
+            <Tabs
+              tabs={[
+                { label: "Semua", value: "SEMUA" },
+                { label: "Lunas", value: "LUNAS" },
+                { label: "Tunggakan", value: "TUNGGAKAN" },
+              ]}
+              value={tab}
+              onChange={setTab}
+            />
+            <Popover triggerLabel="Tampilan">
+              <label className="checkbox-row compact-row">
+                <input
+                  type="checkbox"
+                  checked={compactMode}
+                  onChange={(e) => setCompactMode(e.target.checked)}
+                />
+                Mode kompak
+              </label>
+            </Popover>
+          </div>
+        </div>
+
+        {selectedIds.length ? (
+          <div className="bulk-bar">
+            <span>{selectedIds.length} tagihan dipilih</span>
+            <button type="button" className="btn-secondary" onClick={() => setSelectedIds([])}>Reset Pilihan</button>
+          </div>
+        ) : null}
+
+        {!filteredRows.length ? (
+          <EmptyState
+            title="Belum ada data tagihan"
+            description="Data tagihan akan tampil setelah proses generate pada modul pembuatan tagihan selesai."
+            cta="Muat Ulang"
+            onAction={() => loadData(1)}
+          />
+        ) : (
+          <div className="table-wrap">
+            <table className={compactMode ? "table-compact" : ""}>
+              <thead>
+                <tr>
+                  <th>
+                    <input type="checkbox" checked={allChecked} onChange={toggleCheckAll} aria-label="Pilih semua" />
+                  </th>
+                  <th>Santri</th>
+                  <th>Komponen</th>
+                  <th>Periode</th>
+                  <th>Tagihan</th>
+                  <th>Terbayar</th>
+                  <th>Sisa</th>
+                  <th>Status</th>
+                  <th>Jatuh Tempo</th>
+                  <th>PIC</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.map((row) => (
+                  <tr key={row.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(row.id)}
+                        onChange={() => toggleCheck(row.id)}
+                        aria-label={`Pilih ${row.santri.nama}`}
+                      />
+                    </td>
+                    <td>{row.santri.nis} - {row.santri.nama}</td>
+                    <td>{row.komponen.kode} - {row.komponen.nama}</td>
+                    <td>{row.periodeKey}</td>
+                    <td>{formatNumber(row.nominal)}</td>
+                    <td>{formatNumber(row.nominalTerbayar)}</td>
+                    <td>{formatNumber(Math.max(0, row.nominal - row.nominalTerbayar))}</td>
+                    <td><span className="status-badge">{row.status}</span></td>
+                    <td>{new Date(row.jatuhTempo).toISOString().slice(0, 10)}</td>
+                    <td>{row.picUser?.username || "-"}</td>
+                    <td>
+                      <div className="row-actions">
+                        <button type="button" className="btn-secondary" onClick={() => openEditModal(row)}>Edit</button>
+                        {(row.status === "TERBIT" || row.status === "SEBAGIAN") ? (
+                          <button type="button" onClick={() => openPaymentForm(row)}>Bayar</button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="pagination">
+          <button type="button" disabled={loading || page <= 1} onClick={() => loadData(page - 1)}>Prev</button>
+          <span>Page {page} / {totalPages}</span>
+          <button type="button" disabled={loading || page >= totalPages} onClick={() => loadData(page + 1)}>Next</button>
+        </div>
+      </Card>
+
+      <Modal
+        open={editOpen}
+        title="Edit Tagihan"
+        onClose={() => setEditOpen(false)}
+        footer={
+          <>
+            <button type="submit" form="edit-tagihan-form">Simpan</button>
+            <button type="button" className="btn-secondary" onClick={() => setEditOpen(false)}>Batal</button>
+          </>
+        }
+      >
+        <form id="edit-tagihan-form" className="form-grid" onSubmit={submitEditStatus}>
+          <p className="hint-text">
+            {editing ? `${editing.santri.nis} - ${editing.santri.nama}` : "-"}
+          </p>
+
+          <label htmlFor="nextStatus">Status</label>
+          <select id="nextStatus" value={nextStatus} onChange={(e) => setNextStatus(e.target.value as TagihanStatus)}>
+            {STATUS_OPTIONS.map((item) => (
+              <option key={item} value={item}>{item}</option>
+            ))}
+          </select>
+        </form>
+      </Modal>
+
+      <Modal
+        open={paymentOpen}
+        title="Pembayaran Tagihan"
+        onClose={resetPaymentForm}
+        footer={
+          <>
+            <button type="submit" form="payment-form" disabled={loading}>Simpan</button>
+            <button type="button" className="btn-secondary" onClick={resetPaymentForm}>Batal</button>
+          </>
+        }
+      >
+        <form id="payment-form" className="form-grid" onSubmit={bayarTagihan}>
+          {selectedPaymentRow ? (
+            <p className="hint-text">
+              {selectedPaymentRow.santri.nis} - {selectedPaymentRow.santri.nama} | {selectedPaymentRow.komponen.kode} - {selectedPaymentRow.komponen.nama} | Tagihan: {formatNumber(selectedPaymentRow.nominal)} | Sisa: {formatNumber(Math.max(0, selectedPaymentRow.nominal - selectedPaymentRow.nominalTerbayar))}
+            </p>
+          ) : null}
 
           <label htmlFor="paymentNominal">Nominal Bayar</label>
           <input
@@ -240,94 +400,8 @@ export default function TagihanPage() {
             onChange={(e) => setPaymentReferensi(e.target.value)}
             required={paymentMetode === "TRANSFER"}
           />
-
-          <div className="row-actions">
-            <button type="submit" disabled={loading}>Simpan Pembayaran</button>
-            <button type="button" onClick={resetPaymentForm} disabled={loading}>Batal</button>
-          </div>
         </form>
-      ) : null}
-
-      {message ? <p className="error-text">{message}</p> : null}
-
-      {!groupedRows.length ? (
-        <p className="hint-text">Belum ada data tagihan</p>
-      ) : (
-        groupedRows.map((group) => {
-          const totalNominalAwal = group.items.reduce((sum, item) => sum + item.nominalAwal, 0);
-          const totalNominalDiskon = group.items.reduce((sum, item) => sum + item.nominalDiskon, 0);
-          const totalNominal = group.items.reduce((sum, item) => sum + item.nominal, 0);
-          const totalTerbayar = group.items.reduce((sum, item) => sum + item.nominalTerbayar, 0);
-          const totalSisa = Math.max(0, totalNominal - totalTerbayar);
-
-          return (
-            <div key={group.santri.id} className="stack-block">
-              <h3>
-                {group.santri.nis} - {group.santri.nama} ({group.santri.kelas?.nama || "-"})
-              </h3>
-              <div className="hint-text">
-                Total Awal: {formatNumber(totalNominalAwal)} | Total Diskon: {formatNumber(totalNominalDiskon)} | Total Tagihan: {formatNumber(totalNominal)} | Terbayar: {formatNumber(totalTerbayar)} | Sisa: {formatNumber(totalSisa)}
-              </div>
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Komponen</th>
-                      <th>Master</th>
-                      <th>Periode</th>
-                      <th>Nominal Awal</th>
-                      <th>Nominal Diskon</th>
-                      <th>Nominal Tagihan</th>
-                      <th>Nominal Terbayar</th>
-                      <th>Nominal Belum Dibayar</th>
-                      <th>Status</th>
-                      <th>Jatuh Tempo</th>
-                      <th>PIC</th>
-                      <th>Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {group.items.map((row) => (
-                      <tr key={row.id}>
-                        <td>{row.komponen.kode} - {row.komponen.nama}</td>
-                        <td>{row.master.namaTagihan || "-"}</td>
-                        <td>{row.periodeKey}</td>
-                        <td>{formatNumber(row.nominalAwal)}</td>
-                        <td>{formatNumber(row.nominalDiskon)}</td>
-                        <td>{formatNumber(row.nominal)}</td>
-                        <td>{formatNumber(row.nominalTerbayar)}</td>
-                        <td>{formatNumber(Math.max(0, row.nominal - row.nominalTerbayar))}</td>
-                        <td>{row.status}</td>
-                        <td>{new Date(row.jatuhTempo).toISOString().slice(0, 10)}</td>
-                        <td>{row.picUser?.username || "-"}</td>
-                        <td>
-                          <div className="row-actions">
-                            {row.status === "DRAFT" ? (
-                              <button type="button" onClick={() => updateStatus(row.id, "TERBIT")} disabled={loading}>Publish</button>
-                            ) : null}
-                            {row.status === "TERBIT" || row.status === "SEBAGIAN" ? (
-                              <button type="button" onClick={() => openPaymentForm(row)} disabled={loading}>Bayar</button>
-                            ) : null}
-                            {(row.status === "TERBIT" || row.status === "SEBAGIAN" || row.status === "DRAFT") ? (
-                              <button type="button" className="btn-danger" onClick={() => updateStatus(row.id, "BATAL")} disabled={loading}>Batal</button>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          );
-        })
-      )}
-
-      <div className="row-actions">
-        <button type="button" disabled={loading || page <= 1} onClick={() => loadData(page - 1)}>Prev</button>
-        <span>Page {page} / {totalPages}</span>
-        <button type="button" disabled={loading || page >= totalPages} onClick={() => loadData(page + 1)}>Next</button>
-      </div>
+      </Modal>
     </section>
   );
 }

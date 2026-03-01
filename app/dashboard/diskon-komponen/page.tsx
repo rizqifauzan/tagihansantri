@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { Card, Modal } from "@/app/dashboard/_components/primitives";
 
 type Komponen = { id: string; kode: string; nama: string };
 type Kategori = { id: string; kode: string; nama: string; eligibilityRule: string };
@@ -28,6 +29,7 @@ export default function DiskonKomponenPage() {
   const [komponenId, setKomponenId] = useState("");
   const [kategoriId, setKategoriId] = useState("");
   const [persentase, setPersentase] = useState("10");
+  const [formOpen, setFormOpen] = useState(false);
 
   async function loadMaster() {
     const [kompRes, katRes] = await Promise.all([
@@ -74,6 +76,11 @@ export default function DiskonKomponenPage() {
     setPersentase("10");
   }
 
+  function closeForm() {
+    setFormOpen(false);
+    resetForm();
+  }
+
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setMessage("");
@@ -96,6 +103,7 @@ export default function DiskonKomponenPage() {
       return;
     }
 
+    setFormOpen(false);
     resetForm();
     await loadData(page, q);
   }
@@ -113,42 +121,23 @@ export default function DiskonKomponenPage() {
   }
 
   return (
-    <section>
-      <h2>Konfigurasi Diskon per Komponen</h2>
+    <section className="dashboard-main">
+      <header className="page-head">
+        <div>
+          <h2>Diskon Komponen</h2>
+          <p>Konfigurasi diskon per komponen agar perhitungan tagihan lebih presisi.</p>
+        </div>
+      </header>
 
+      <Card>
+      <div className="row-actions" style={{ marginBottom: 8 }}>
+        <button type="button" onClick={() => { resetForm(); setFormOpen(true); }}>
+          Tambah Konfigurasi
+        </button>
+      </div>
       <form className="toolbar" onSubmit={(e) => { e.preventDefault(); loadData(1, q); }}>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari komponen / kategori" />
         <button type="submit">Cari</button>
-      </form>
-
-      <form className="form-grid" onSubmit={onSubmit}>
-        <h3>{formId ? "Edit Konfigurasi" : "Tambah Konfigurasi"}</h3>
-
-        <label htmlFor="komponen">Komponen</label>
-        <select id="komponen" value={komponenId} onChange={(e) => setKomponenId(e.target.value)}>
-          {komponenOptions.map((k) => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
-        </select>
-
-        <label htmlFor="kategori">Kategori Diskon</label>
-        <select id="kategori" value={kategoriId} onChange={(e) => setKategoriId(e.target.value)}>
-          {kategoriOptions.map((k) => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
-        </select>
-
-        <label htmlFor="persentase">Persentase</label>
-        <input
-          id="persentase"
-          type="number"
-          min="0.01"
-          max="100"
-          step="0.01"
-          value={persentase}
-          onChange={(e) => setPersentase(e.target.value)}
-        />
-
-        <div className="row-actions">
-          <button type="submit">{formId ? "Update" : "Simpan"}</button>
-          {formId ? <button type="button" className="btn-secondary" onClick={resetForm}>Batal</button> : null}
-        </div>
       </form>
 
       {message ? <p className="error-text">{message}</p> : null}
@@ -178,6 +167,7 @@ export default function DiskonKomponenPage() {
                       setKomponenId(row.komponen.id);
                       setKategoriId(row.kategori.id);
                       setPersentase(String(row.persentase));
+                      setFormOpen(true);
                     }}>Edit</button>
                     <button type="button" className="btn-danger" onClick={() => onDelete(row.id)}>Hapus</button>
                   </div>
@@ -194,6 +184,42 @@ export default function DiskonKomponenPage() {
         <span>Halaman {page} / {totalPages}</span>
         <button type="button" disabled={page >= totalPages} onClick={() => loadData(page + 1, q)}>Berikutnya</button>
       </div>
+      </Card>
+
+      <Modal
+        open={formOpen}
+        title={formId ? "Edit Konfigurasi" : "Tambah Konfigurasi"}
+        onClose={closeForm}
+        footer={(
+          <>
+            <button type="submit" form="diskon-komponen-form">{formId ? "Update" : "Simpan"}</button>
+            <button type="button" className="btn-secondary" onClick={closeForm}>Batal</button>
+          </>
+        )}
+      >
+        <form id="diskon-komponen-form" className="form-grid" onSubmit={onSubmit}>
+          <label htmlFor="komponen">Komponen</label>
+          <select id="komponen" value={komponenId} onChange={(e) => setKomponenId(e.target.value)}>
+            {komponenOptions.map((k) => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
+          </select>
+
+          <label htmlFor="kategori">Kategori Diskon</label>
+          <select id="kategori" value={kategoriId} onChange={(e) => setKategoriId(e.target.value)}>
+            {kategoriOptions.map((k) => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
+          </select>
+
+          <label htmlFor="persentase">Persentase</label>
+          <input
+            id="persentase"
+            type="number"
+            min="0.01"
+            max="100"
+            step="0.01"
+            value={persentase}
+            onChange={(e) => setPersentase(e.target.value)}
+          />
+        </form>
+      </Modal>
     </section>
   );
 }

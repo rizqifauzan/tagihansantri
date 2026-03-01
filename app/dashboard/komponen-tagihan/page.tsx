@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { Card, Modal } from "@/app/dashboard/_components/primitives";
 
 type Komponen = {
   id: string;
@@ -31,6 +32,7 @@ export default function KomponenTagihanPage() {
   const [nama, setNama] = useState("");
   const [tipe, setTipe] = useState<(typeof TIPE_OPTIONS)[number]>("BULANAN");
   const [active, setActive] = useState(true);
+  const [formOpen, setFormOpen] = useState(false);
 
   async function loadData(nextPage = page, keyword = q) {
     setLoading(true);
@@ -70,6 +72,11 @@ export default function KomponenTagihanPage() {
     setActive(true);
   }
 
+  function closeForm() {
+    setFormOpen(false);
+    resetForm();
+  }
+
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setMessage("");
@@ -105,6 +112,7 @@ export default function KomponenTagihanPage() {
       return;
     }
 
+    setFormOpen(false);
     resetForm();
     await loadData(page, q);
   }
@@ -125,9 +133,20 @@ export default function KomponenTagihanPage() {
   }
 
   return (
-    <section>
-      <h2>Master Komponen Tagihan</h2>
+    <section className="dashboard-main">
+      <header className="page-head">
+        <div>
+          <h2>Komponen Tagihan</h2>
+          <p>Master komponen biaya untuk proses generate dan pembayaran tagihan.</p>
+        </div>
+      </header>
 
+      <Card>
+      <div className="row-actions" style={{ marginBottom: 8 }}>
+        <button type="button" onClick={() => { resetForm(); setFormOpen(true); }}>
+          Tambah Komponen
+        </button>
+      </div>
       <form
         className="toolbar"
         onSubmit={(e) => {
@@ -142,45 +161,6 @@ export default function KomponenTagihanPage() {
           onChange={(e) => setQ(e.target.value)}
         />
         <button type="submit">Cari</button>
-      </form>
-
-      <form className="form-grid" onSubmit={onSubmit}>
-        <h3>{formId ? "Edit Komponen" : "Tambah Komponen"}</h3>
-
-        <label htmlFor="kode">Kode</label>
-        <input id="kode" value={kode} onChange={(e) => setKode(e.target.value)} required />
-
-        <label htmlFor="nama">Nama</label>
-        <input id="nama" value={nama} onChange={(e) => setNama(e.target.value)} required />
-
-        <label htmlFor="tipe">Tipe</label>
-        <select
-          id="tipe"
-          value={tipe}
-          onChange={(e) => setTipe(e.target.value as (typeof TIPE_OPTIONS)[number])}
-        >
-          <option value="BULANAN">Bulanan</option>
-          <option value="INSIDENTAL">Insidental</option>
-          <option value="SANTRI_BARU">Santri Baru</option>
-        </select>
-
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={active}
-            onChange={(e) => setActive(e.target.checked)}
-          />
-          Aktif
-        </label>
-
-        <div className="row-actions">
-          <button type="submit">{formId ? "Update" : "Simpan"}</button>
-          {formId ? (
-            <button type="button" onClick={resetForm} className="btn-secondary">
-              Batal
-            </button>
-          ) : null}
-        </div>
       </form>
 
       {message ? <p className="error-text">{message}</p> : null}
@@ -213,6 +193,7 @@ export default function KomponenTagihanPage() {
                         setNama(row.nama);
                         setTipe(row.tipe);
                         setActive(row.active);
+                        setFormOpen(true);
                       }}
                     >
                       Edit
@@ -252,6 +233,47 @@ export default function KomponenTagihanPage() {
           Berikutnya
         </button>
       </div>
+      </Card>
+
+      <Modal
+        open={formOpen}
+        title={formId ? "Edit Komponen" : "Tambah Komponen"}
+        onClose={closeForm}
+        footer={(
+          <>
+            <button type="submit" form="komponen-form">{formId ? "Update" : "Simpan"}</button>
+            <button type="button" className="btn-secondary" onClick={closeForm}>Batal</button>
+          </>
+        )}
+      >
+        <form id="komponen-form" className="form-grid" onSubmit={onSubmit}>
+          <label htmlFor="kode">Kode</label>
+          <input id="kode" value={kode} onChange={(e) => setKode(e.target.value)} required />
+
+          <label htmlFor="nama">Nama</label>
+          <input id="nama" value={nama} onChange={(e) => setNama(e.target.value)} required />
+
+          <label htmlFor="tipe">Tipe</label>
+          <select
+            id="tipe"
+            value={tipe}
+            onChange={(e) => setTipe(e.target.value as (typeof TIPE_OPTIONS)[number])}
+          >
+            <option value="BULANAN">Bulanan</option>
+            <option value="INSIDENTAL">Insidental</option>
+            <option value="SANTRI_BARU">Santri Baru</option>
+          </select>
+
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={active}
+              onChange={(e) => setActive(e.target.checked)}
+            />
+            Aktif
+          </label>
+        </form>
+      </Modal>
     </section>
   );
 }

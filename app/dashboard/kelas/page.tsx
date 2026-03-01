@@ -15,6 +15,7 @@ type KelasListResponse = {
 };
 
 import { FormEvent, useEffect, useState } from "react";
+import { Card, Modal } from "@/app/dashboard/_components/primitives";
 
 export default function KelasPage() {
   const [rows, setRows] = useState<Kelas[]>([]);
@@ -27,6 +28,7 @@ export default function KelasPage() {
   const [formId, setFormId] = useState<string | null>(null);
   const [nama, setNama] = useState("");
   const [active, setActive] = useState(true);
+  const [formOpen, setFormOpen] = useState(false);
 
   async function loadData(nextPage = page, keyword = q) {
     setLoading(true);
@@ -62,6 +64,11 @@ export default function KelasPage() {
     setActive(true);
   }
 
+  function closeForm() {
+    setFormOpen(false);
+    resetForm();
+  }
+
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setMessage("");
@@ -85,6 +92,7 @@ export default function KelasPage() {
       return;
     }
 
+    setFormOpen(false);
     resetForm();
     await loadData(page, q);
   }
@@ -105,9 +113,20 @@ export default function KelasPage() {
   }
 
   return (
-    <section>
-      <h2>Master Kelas</h2>
+    <section className="dashboard-main">
+      <header className="page-head">
+        <div>
+          <h2>Data Kelas</h2>
+          <p>Kelola kelas aktif untuk kebutuhan administrasi tagihan santri.</p>
+        </div>
+      </header>
 
+      <Card>
+      <div className="row-actions" style={{ marginBottom: 8 }}>
+        <button type="button" onClick={() => { resetForm(); setFormOpen(true); }}>
+          Tambah Kelas
+        </button>
+      </div>
       <form
         className="toolbar"
         onSubmit={(e) => {
@@ -122,35 +141,6 @@ export default function KelasPage() {
           onChange={(e) => setQ(e.target.value)}
         />
         <button type="submit">Cari</button>
-      </form>
-
-      <form className="form-grid" onSubmit={onSubmit}>
-        <h3>{formId ? "Edit Kelas" : "Tambah Kelas"}</h3>
-        <label htmlFor="nama">Nama Kelas</label>
-        <input
-          id="nama"
-          value={nama}
-          onChange={(e) => setNama(e.target.value)}
-          required
-        />
-
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={active}
-            onChange={(e) => setActive(e.target.checked)}
-          />
-          Aktif
-        </label>
-
-        <div className="row-actions">
-          <button type="submit">{formId ? "Update" : "Simpan"}</button>
-          {formId ? (
-            <button type="button" onClick={resetForm} className="btn-secondary">
-              Batal
-            </button>
-          ) : null}
-        </div>
       </form>
 
       {message ? <p className="error-text">{message}</p> : null}
@@ -177,6 +167,7 @@ export default function KelasPage() {
                         setFormId(row.id);
                         setNama(row.nama);
                         setActive(row.active);
+                        setFormOpen(true);
                       }}
                     >
                       Edit
@@ -216,6 +207,38 @@ export default function KelasPage() {
           Berikutnya
         </button>
       </div>
+      </Card>
+
+      <Modal
+        open={formOpen}
+        title={formId ? "Edit Kelas" : "Tambah Kelas"}
+        onClose={closeForm}
+        footer={(
+          <>
+            <button type="submit" form="kelas-form">{formId ? "Update" : "Simpan"}</button>
+            <button type="button" className="btn-secondary" onClick={closeForm}>Batal</button>
+          </>
+        )}
+      >
+        <form id="kelas-form" className="form-grid" onSubmit={onSubmit}>
+          <label htmlFor="nama">Nama Kelas</label>
+          <input
+            id="nama"
+            value={nama}
+            onChange={(e) => setNama(e.target.value)}
+            required
+          />
+
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={active}
+              onChange={(e) => setActive(e.target.checked)}
+            />
+            Aktif
+          </label>
+        </form>
+      </Modal>
     </section>
   );
 }

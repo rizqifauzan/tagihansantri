@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Card } from "@/app/dashboard/_components/primitives";
 
 type MatrixFilter =
   | "ALL"
@@ -131,12 +132,18 @@ export default function TagihanMatrixPage() {
   const summaryColumnCount = data.countView === "SEMUA" ? 8 : 6;
 
   return (
-    <section>
-      <h2>Semua Tagihan (Matrix per Santri)</h2>
+    <section className="dashboard-main">
+      <header className="page-head">
+        <div>
+          <h2>Laporan Matrix</h2>
+          <p>Monitoring seluruh tagihan santri dalam tampilan matrix komponen dan periode.</p>
+        </div>
+      </header>
+
+      <Card>
       <p className="hint-text">
         Header: Komponen Tagihan lalu Periode. Baris: daftar santri. Sel berisi nominal tagihan.
       </p>
-
       <div className="row-actions" style={{ marginBottom: 12 }}>
         <input
           placeholder="Cari NIS/Nama/Kelas"
@@ -252,6 +259,7 @@ export default function TagihanMatrixPage() {
           </tbody>
         </table>
       </div>
+      </Card>
     </section>
   );
 }

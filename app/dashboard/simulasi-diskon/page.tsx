@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { Card } from "@/app/dashboard/_components/primitives";
 const formatNumber = (value: number) => value.toLocaleString("id-ID");
 const parseNumberInput = (value: string) => Number((value || "").replace(/\./g, "")) || 0;
 const formatNumberInput = (value: string) => {
@@ -71,10 +72,16 @@ export default function SimulasiDiskonPage() {
   }
 
   return (
-    <section>
-      <h2>Simulasi Diskon</h2>
-      <p className="hint-text">Rule resolusi: jika multi-eligible, sistem memilih persentase diskon terbesar.</p>
+    <section className="dashboard-main">
+      <header className="page-head">
+        <div>
+          <h2>Simulasi Diskon</h2>
+          <p>Uji kebijakan diskon sebelum rule diterapkan ke data tagihan aktual.</p>
+        </div>
+      </header>
 
+      <Card>
+      <p className="hint-text">Rule resolusi: jika multi-eligible, sistem memilih persentase diskon terbesar.</p>
       <form className="form-grid" onSubmit={onSimulate}>
         <label htmlFor="santri">Santri</label>
         <select id="santri" value={santriId} onChange={(e) => setSantriId(e.target.value)}>
@@ -117,6 +124,7 @@ export default function SimulasiDiskonPage() {
           </p>
         </div>
       ) : null}
+      </Card>
     </section>
   );
 }

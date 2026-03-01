@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
 import { env } from "@/lib/env";
+import { DashboardShell } from "@/app/dashboard/_components/dashboard-shell";
 
 export default async function DashboardLayout({
   children,
@@ -16,35 +16,8 @@ export default async function DashboardLayout({
   }
 
   return (
-    <main className="container dashboard-shell">
-      <div className="dashboard-topbar">
-        <div>
-          <h1>{env.appName}</h1>
-          <p>Login sebagai: {session.username}</p>
-        </div>
-        <form action="/api/auth/logout" method="post">
-          <button type="submit">Logout</button>
-        </form>
-      </div>
-
-      <nav className="dashboard-nav">
-        <Link href="/dashboard">Home</Link>
-        <Link href="/dashboard/users">Manajemen User</Link>
-        <Link href="/dashboard/kelas">Master Kelas</Link>
-        <Link href="/dashboard/keluarga">Master Keluarga</Link>
-        <Link href="/dashboard/santri">Master Santri</Link>
-        <Link href="/dashboard/komponen-tagihan">Komponen Tagihan</Link>
-        <Link href="/dashboard/diskon-kategori">Kategori Diskon</Link>
-        <Link href="/dashboard/diskon-komponen">Diskon per Komponen</Link>
-        <Link href="/dashboard/simulasi-diskon">Simulasi Diskon</Link>
-        <Link href="/dashboard/rule-tagihan">Rule Tagihan</Link>
-        <Link href="/dashboard/tagihan-master">Pembuatan Tagihan</Link>
-        <Link href="/dashboard/tagihan">Tagihan per Santri</Link>
-        <Link href="/dashboard/tagihan-matrix">Semua Tagihan Matrix</Link>
-        <Link href="/dashboard/pembayaran">Pembayaran & Kwitansi</Link>
-      </nav>
-
+    <DashboardShell appName={env.appName} username={session.username}>
       {children}
-    </main>
+    </DashboardShell>
   );
 }

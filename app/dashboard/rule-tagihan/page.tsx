@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { Card, Modal } from "@/app/dashboard/_components/primitives";
 const formatNumber = (value: number) => value.toLocaleString("id-ID");
 const parseNumberInput = (value: string) => Number((value || "").replace(/\./g, "")) || 0;
 const formatNumberInput = (value: string) => {
@@ -47,6 +48,7 @@ export default function RuleTagihanPage() {
   const [kelasId, setKelasId] = useState("");
   const [gender, setGender] = useState<"L" | "P">("L");
   const [santriId, setSantriId] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
 
   async function loadMaster() {
     const [kompRes, kelasRes, santriRes] = await Promise.all([
@@ -99,6 +101,11 @@ export default function RuleTagihanPage() {
     setCakupan("GLOBAL");
   }
 
+  function closeForm() {
+    setFormOpen(false);
+    resetForm();
+  }
+
   function buildPayload() {
     return {
       komponenId,
@@ -126,6 +133,7 @@ export default function RuleTagihanPage() {
       return;
     }
 
+    setFormOpen(false);
     resetForm();
     await loadData(page, q);
   }
@@ -169,66 +177,24 @@ export default function RuleTagihanPage() {
   }
 
   return (
-    <section>
-      <h2>Rule Tagihan</h2>
-      <p className="hint-text">Draft boleh bentrok. Publish akan ditolak jika bentrok dengan rule published lain.</p>
+    <section className="dashboard-main">
+      <header className="page-head">
+        <div>
+          <h2>Rule Tagihan</h2>
+          <p>Atur rule nominal tagihan per cakupan data dengan workflow draft/publish.</p>
+        </div>
+      </header>
 
+      <Card>
+      <p className="hint-text">Draft boleh bentrok. Publish akan ditolak jika bentrok dengan rule published lain.</p>
+      <div className="row-actions" style={{ marginBottom: 8 }}>
+        <button type="button" onClick={() => { resetForm(); setFormOpen(true); }}>
+          Tambah Rule
+        </button>
+      </div>
       <form className="toolbar" onSubmit={(e) => { e.preventDefault(); loadData(1, q); }}>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari komponen/kelas/santri" />
         <button type="submit">Cari</button>
-      </form>
-
-      <form className="form-grid" onSubmit={onSubmit}>
-        <h3>{formId ? "Edit Rule (DRAFT)" : "Tambah Rule (DRAFT)"}</h3>
-
-        <label htmlFor="komponen">Komponen</label>
-        <select id="komponen" value={komponenId} onChange={(e) => setKomponenId(e.target.value)}>
-          {komponenOptions.map((k) => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
-        </select>
-
-        <label htmlFor="nominal">Nominal</label>
-        <input id="nominal" inputMode="numeric" value={nominal} onChange={(e) => setNominal(formatNumberInput(e.target.value))} />
-
-        <label htmlFor="cakupan">Cakupan</label>
-        <select id="cakupan" value={cakupan} onChange={(e) => setCakupan(e.target.value as Cakupan)}>
-          <option value="GLOBAL">GLOBAL</option>
-          <option value="KELAS">KELAS</option>
-          <option value="GENDER">GENDER</option>
-          <option value="SANTRI">SANTRI</option>
-        </select>
-
-        {cakupan === "KELAS" ? (
-          <>
-            <label htmlFor="kelas">Pilih Kelas</label>
-            <select id="kelas" value={kelasId} onChange={(e) => setKelasId(e.target.value)}>
-              {kelasOptions.map((k) => <option key={k.id} value={k.id}>{k.nama}</option>)}
-            </select>
-          </>
-        ) : null}
-
-        {cakupan === "GENDER" ? (
-          <>
-            <label htmlFor="gender">Pilih Gender</label>
-            <select id="gender" value={gender} onChange={(e) => setGender(e.target.value as "L" | "P")}>
-              <option value="L">Laki-laki</option>
-              <option value="P">Perempuan</option>
-            </select>
-          </>
-        ) : null}
-
-        {cakupan === "SANTRI" ? (
-          <>
-            <label htmlFor="santri">Pilih Santri</label>
-            <select id="santri" value={santriId} onChange={(e) => setSantriId(e.target.value)}>
-              {santriOptions.map((s) => <option key={s.id} value={s.id}>{s.nis} - {s.nama}</option>)}
-            </select>
-          </>
-        ) : null}
-
-        <div className="row-actions">
-          <button type="submit">{formId ? "Update" : "Simpan Draft"}</button>
-          {formId ? <button type="button" className="btn-secondary" onClick={resetForm}>Batal</button> : null}
-        </div>
       </form>
 
       {message ? <p className="error-text">{message}</p> : null}
@@ -263,6 +229,7 @@ export default function RuleTagihanPage() {
                           setKelasId(row.kelasId || kelasOptions[0]?.id || "");
                           setGender((row.gender || "L") as "L" | "P");
                           setSantriId(row.santriId || santriOptions[0]?.id || "");
+                          setFormOpen(true);
                         }}>Edit</button>
                         <button type="button" onClick={() => onPublish(row.id)}>Publish</button>
                       </>
@@ -284,6 +251,65 @@ export default function RuleTagihanPage() {
         <span>Halaman {page} / {totalPages}</span>
         <button type="button" disabled={page >= totalPages} onClick={() => loadData(page + 1, q)}>Berikutnya</button>
       </div>
+      </Card>
+
+      <Modal
+        open={formOpen}
+        title={formId ? "Edit Rule (Draft)" : "Tambah Rule (Draft)"}
+        onClose={closeForm}
+        footer={(
+          <>
+            <button type="submit" form="rule-form">{formId ? "Update" : "Simpan Draft"}</button>
+            <button type="button" className="btn-secondary" onClick={closeForm}>Batal</button>
+          </>
+        )}
+      >
+        <form id="rule-form" className="form-grid" onSubmit={onSubmit}>
+          <label htmlFor="komponen">Komponen</label>
+          <select id="komponen" value={komponenId} onChange={(e) => setKomponenId(e.target.value)}>
+            {komponenOptions.map((k) => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
+          </select>
+
+          <label htmlFor="nominal">Nominal</label>
+          <input id="nominal" inputMode="numeric" value={nominal} onChange={(e) => setNominal(formatNumberInput(e.target.value))} />
+
+          <label htmlFor="cakupan">Cakupan</label>
+          <select id="cakupan" value={cakupan} onChange={(e) => setCakupan(e.target.value as Cakupan)}>
+            <option value="GLOBAL">GLOBAL</option>
+            <option value="KELAS">KELAS</option>
+            <option value="GENDER">GENDER</option>
+            <option value="SANTRI">SANTRI</option>
+          </select>
+
+          {cakupan === "KELAS" ? (
+            <>
+              <label htmlFor="kelas">Pilih Kelas</label>
+              <select id="kelas" value={kelasId} onChange={(e) => setKelasId(e.target.value)}>
+                {kelasOptions.map((k) => <option key={k.id} value={k.id}>{k.nama}</option>)}
+              </select>
+            </>
+          ) : null}
+
+          {cakupan === "GENDER" ? (
+            <>
+              <label htmlFor="gender">Pilih Gender</label>
+              <select id="gender" value={gender} onChange={(e) => setGender(e.target.value as "L" | "P")}>
+                <option value="L">Laki-laki</option>
+                <option value="P">Perempuan</option>
+              </select>
+            </>
+          ) : null}
+
+          {cakupan === "SANTRI" ? (
+            <>
+              <label htmlFor="santri">Pilih Santri</label>
+              <select id="santri" value={santriId} onChange={(e) => setSantriId(e.target.value)}>
+                {santriOptions.map((s) => <option key={s.id} value={s.id}>{s.nis} - {s.nama}</option>)}
+              </select>
+            </>
+          ) : null}
+        </form>
+      </Modal>
     </section>
   );
 }
