@@ -247,6 +247,43 @@ button:disabled {
   background: #fff;
 }
 
+.matrix-wrap {
+  max-height: 75vh;
+  overflow: auto;
+}
+
+.matrix-table th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.matrix-table thead tr:nth-child(2) th {
+  top: 41px;
+  z-index: 4;
+}
+
+.matrix-table .sticky-col {
+  position: sticky;
+  z-index: 5;
+  background: #fff;
+}
+
+.matrix-table th.sticky-col {
+  background: #f8fbff;
+  z-index: 6;
+}
+
+.matrix-table .sticky-col-1 {
+  left: 0;
+  min-width: 140px;
+}
+
+.matrix-table .sticky-col-2 {
+  left: 140px;
+  min-width: 220px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { applyKomponenDiscount } from "@/lib/tagihan-discount";
+import { resolvePicForTargets } from "@/lib/tagihan-pic";
 import {
   determineMonthlyStatus,
   existingSantriIdsForPeriod,
   isWithinRange,
   resolveTargetSantri,
   toInsidentalPeriodKey,
+  toMonthlyDueDate,
   toMonthlyPeriodKey,
 } from "@/lib/tagihan-master";
 
@@ -43,6 +46,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     where: { id },
     include: {
       komponen: { select: { id: true, tipe: true } },
+      picKelas: { select: { kelasId: true, picUserId: true } },
       details: true,
     },
   });
@@ -54,6 +58,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   let periodeKey = "";
+  let periodMonth: number | null = null;
+  let periodYear: number | null = null;
   if (master.komponen.tipe === "BULANAN") {
     const now = getWibMonthYear();
     const month = requestedMonth >= 1 && requestedMonth <= 12 ? requestedMonth : now.month;
@@ -70,6 +76,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     periodeKey = toMonthlyPeriodKey(month, year);
+    periodMonth = month;
+    periodYear = year;
   } else {
     periodeKey = toInsidentalPeriodKey(master.tanggalTerbit, master.jatuhTempo);
   }
@@ -78,6 +86,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     targetType: master.targetType,
     nominalGlobal: master.nominalGlobal,
     details: master.details,
+    periodMonth,
+    periodYear,
   });
 
   const existingSet = await existingSantriIdsForPeriod({
@@ -87,6 +97,25 @@ export async function POST(req: NextRequest, { params }: Params) {
   });
 
   const toCreate = targets.filter((t: any) => !existingSet.has(t.santriId));
+  const discountedToCreate = await applyKomponenDiscount({
+    komponenId: master.komponenId,
+    targets: toCreate.map((t: any) => ({ santriId: t.santriId, nominal: t.nominal })),
+  });
+  const resolvedPics = await resolvePicForTargets(
+    {
+      picMode: master.picMode,
+      picGlobalUserId: master.picGlobalUserId,
+      picPutraUserId: master.picPutraUserId,
+      picPutriUserId: master.picPutriUserId,
+      picKelas: master.picKelas,
+    },
+    toCreate.map((t: any) => ({ santriId: t.santriId, nominal: t.nominal })),
+  );
+  const picMap = new Map(resolvedPics.map((row) => [row.santriId, row.picUserId]));
+  const generatedDueDate =
+    master.komponen.tipe === "BULANAN" && periodMonth && periodYear
+      ? toMonthlyDueDate(master.jatuhTempo, periodMonth, periodYear)
+      : master.jatuhTempo;
 
   const now = getWibMonthYear();
   const nextStatus =
@@ -104,21 +133,31 @@ export async function POST(req: NextRequest, { params }: Params) {
         ? "ACTIVE"
         : "INACTIVE";
 
-  const result = await prisma.$transaction(async (tx) => {
+  const { master: updatedMaster, createdCount } = await prisma.$transaction(async (tx) => {
     const t = tx as any;
+    let insertedCount = 0;
 
     if (toCreate.length) {
-      await t.tagihan.createMany({
-        data: toCreate.map((r: any) => ({
-          masterId: master.id,
-          santriId: r.santriId,
-          komponenId: master.komponenId,
-          periodeKey,
-          nominal: r.nominal,
-          jatuhTempo: master.jatuhTempo,
-          status: "TERBIT",
-        })),
+      const created = await t.tagihan.createMany({
+        skipDuplicates: true,
+        data: discountedToCreate.map((r: any) => {
+          const isZeroBill = r.nominalAkhir <= 0;
+          return {
+            masterId: master.id,
+            santriId: r.santriId,
+            komponenId: master.komponenId,
+            periodeKey,
+            nominalAwal: r.nominalAwal,
+            nominalDiskon: r.nominalDiskon,
+            nominal: r.nominalAkhir,
+            nominalTerbayar: isZeroBill ? r.nominalAkhir : 0,
+            picUserId: picMap.get(r.santriId) || null,
+            jatuhTempo: generatedDueDate,
+            status: isZeroBill ? "LUNAS" : (master.komponen.tipe === "INSIDENTAL" ? "DRAFT" : "TERBIT"),
+          };
+        }),
       });
+      insertedCount = created.count;
     }
 
     const updated = await t.tagihanMaster.update({
@@ -132,22 +171,22 @@ export async function POST(req: NextRequest, { params }: Params) {
         periodeKey,
         source,
         totalTarget: targets.length,
-        generated: toCreate.length,
-        skipped: targets.length - toCreate.length,
+        generated: insertedCount,
+        skipped: targets.length - insertedCount,
         success: true,
         message: "Generate selesai",
       },
     });
 
-    return updated;
+    return { master: updated, createdCount: insertedCount };
   });
 
   return NextResponse.json({
     ok: true,
-    master: result,
+    master: updatedMaster,
     periodeKey,
-    generatedCount: toCreate.length,
-    skippedCount: targets.length - toCreate.length,
+    generatedCount: createdCount,
+    skippedCount: targets.length - createdCount,
     totalTarget: targets.length,
   });
 }

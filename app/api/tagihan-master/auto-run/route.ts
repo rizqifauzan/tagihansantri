@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { applyKomponenDiscount } from "@/lib/tagihan-discount";
+import { resolvePicForTargets } from "@/lib/tagihan-pic";
 import {
   determineMonthlyStatus,
   existingSantriIdsForPeriod,
   isWithinRange,
   resolveTargetSantri,
+  toMonthlyDueDate,
   toMonthlyPeriodKey,
 } from "@/lib/tagihan-master";
 
@@ -14,27 +17,48 @@ function getWibMonthYear() {
     timeZone: "Asia/Jakarta",
     year: "numeric",
     month: "2-digit",
+    day: "2-digit",
   });
   const parts = fmt.formatToParts(new Date());
   const year = Number(parts.find((p) => p.type === "year")?.value || "0");
   const month = Number(parts.find((p) => p.type === "month")?.value || "0");
-  return { year, month };
+  const day = Number(parts.find((p) => p.type === "day")?.value || "0");
+  return { year, month, day };
 }
 
-export async function POST(req: NextRequest) {
-  const unauthorized = await requireAdmin(req);
-  if (unauthorized) return unauthorized;
+function isAuthorizedCron(req: NextRequest): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  const authHeader = req.headers.get("authorization") || "";
+  return authHeader === `Bearer ${secret}`;
+}
+
+async function runAutoGenerate(req: NextRequest) {
+  if (!isAuthorizedCron(req)) {
+    const unauthorized = await requireAdmin(req);
+    if (unauthorized) return unauthorized;
+  }
 
   const now = getWibMonthYear();
+  if (now.day !== 1) {
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      reason: "Bukan tanggal 1 WIB",
+      wibDate: `${now.year}-${String(now.month).padStart(2, "0")}-${String(now.day).padStart(2, "0")}`,
+    });
+  }
   const periodKey = toMonthlyPeriodKey(now.month, now.year);
 
-  const masters = await prisma.tagihanMaster.findMany({
+  const db = prisma as any;
+
+  const masters = await db.tagihanMaster.findMany({
     where: {
       autoGenerateEnabled: true,
       status: { in: ["SCHEDULED", "ACTIVE"] },
       komponen: { tipe: "BULANAN" },
     },
-    include: { details: true },
+    include: { details: true, picKelas: { select: { kelasId: true, picUserId: true } } },
   });
 
   let totalGenerated = 0;
@@ -58,7 +82,7 @@ export async function POST(req: NextRequest) {
         nowYear: now.year,
         manualInactive: !master.autoGenerateEnabled,
       });
-      await prisma.tagihanMaster.update({ where: { id: master.id }, data: { status } });
+      await db.tagihanMaster.update({ where: { id: master.id }, data: { status } });
       continue;
     }
 
@@ -66,6 +90,8 @@ export async function POST(req: NextRequest) {
       targetType: master.targetType,
       nominalGlobal: master.nominalGlobal,
       details: master.details,
+      periodMonth: now.month,
+      periodYear: now.year,
     });
 
     const existingSet = await existingSantriIdsForPeriod({
@@ -75,20 +101,73 @@ export async function POST(req: NextRequest) {
     });
 
     const toCreate = targets.filter((t) => !existingSet.has(t.santriId));
+    const discountedToCreate = await applyKomponenDiscount({
+      komponenId: master.komponenId,
+      targets: toCreate.map((t) => ({ santriId: t.santriId, nominal: t.nominal })),
+    });
+    const resolvedPics = await resolvePicForTargets(
+      {
+        picMode: master.picMode,
+        picGlobalUserId: master.picGlobalUserId,
+        picPutraUserId: master.picPutraUserId,
+        picPutriUserId: master.picPutriUserId,
+        picKelas: master.picKelas,
+      },
+      toCreate.map((t) => ({ santriId: t.santriId, nominal: t.nominal })),
+    );
+    const picMap = new Map(resolvedPics.map((row) => [row.santriId, row.picUserId]));
 
-    await prisma.$transaction(async (tx) => {
+    const createdCount = await db.$transaction(async (tx: any) => {
       if (toCreate.length) {
-        await tx.tagihan.createMany({
-          data: toCreate.map((t) => ({
-            masterId: master.id,
-            santriId: t.santriId,
-            komponenId: master.komponenId,
-            periodeKey: periodKey,
-            nominal: t.nominal,
-            jatuhTempo: master.jatuhTempo,
-            status: "TERBIT",
-          })),
+        const created = await tx.tagihan.createMany({
+          skipDuplicates: true,
+          data: discountedToCreate.map((t) => {
+            const isZeroBill = t.nominalAkhir <= 0;
+            return {
+              masterId: master.id,
+              santriId: t.santriId,
+              komponenId: master.komponenId,
+              periodeKey: periodKey,
+              nominalAwal: t.nominalAwal,
+              nominalDiskon: t.nominalDiskon,
+              nominal: t.nominalAkhir,
+              nominalTerbayar: isZeroBill ? t.nominalAkhir : 0,
+              picUserId: picMap.get(t.santriId) || null,
+              jatuhTempo: toMonthlyDueDate(master.jatuhTempo, now.month, now.year),
+              status: isZeroBill ? "LUNAS" : "TERBIT",
+            };
+          }),
         });
+        await tx.tagihanMaster.update({
+          where: { id: master.id },
+          data: {
+            status: determineMonthlyStatus({
+              startBulan,
+              startTahun,
+              endBulan,
+              endTahun,
+              nowMonth: now.month,
+              nowYear: now.year,
+              manualInactive: !master.autoGenerateEnabled,
+            }),
+            lastGeneratedPeriod: periodKey,
+          },
+        });
+
+        await tx.tagihanGenerateLog.create({
+          data: {
+            masterId: master.id,
+            periodeKey: periodKey,
+            source: "auto",
+            totalTarget: targets.length,
+            generated: created.count,
+            skipped: targets.length - created.count,
+            success: true,
+            message: "Auto generate bulanan",
+          },
+        });
+
+        return created.count;
       }
 
       await tx.tagihanMaster.update({
@@ -113,17 +192,18 @@ export async function POST(req: NextRequest) {
           periodeKey: periodKey,
           source: "auto",
           totalTarget: targets.length,
-          generated: toCreate.length,
-          skipped: targets.length - toCreate.length,
+          generated: 0,
+          skipped: targets.length,
           success: true,
           message: "Auto generate bulanan",
         },
       });
+      return 0;
     });
 
     processed += 1;
-    totalGenerated += toCreate.length;
-    totalSkipped += targets.length - toCreate.length;
+    totalGenerated += createdCount;
+    totalSkipped += targets.length - createdCount;
   }
 
   return NextResponse.json({
@@ -133,4 +213,12 @@ export async function POST(req: NextRequest) {
     generated: totalGenerated,
     skipped: totalSkipped,
   });
+}
+
+export async function GET(req: NextRequest) {
+  return runAutoGenerate(req);
+}
+
+export async function POST(req: NextRequest) {
+  return runAutoGenerate(req);
 }

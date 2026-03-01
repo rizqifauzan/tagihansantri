@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
+import { SESSION_COOKIE, SessionPayload, verifySessionToken } from "@/lib/auth";
 
 export async function requireAdmin(req: NextRequest): Promise<NextResponse | null> {
   const token = req.cookies.get(SESSION_COOKIE)?.value;
@@ -10,4 +10,9 @@ export async function requireAdmin(req: NextRequest): Promise<NextResponse | nul
   }
 
   return null;
+}
+
+export async function getAdminSession(req: NextRequest): Promise<SessionPayload | null> {
+  const token = req.cookies.get(SESSION_COOKIE)?.value;
+  return verifySessionToken(token);
 }

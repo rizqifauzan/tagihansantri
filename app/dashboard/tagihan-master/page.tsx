@@ -7,37 +7,96 @@ type Status = "SCHEDULED" | "ACTIVE" | "ENDED" | "INACTIVE";
 type Komponen = { id: string; kode: string; nama: string; tipe: "BULANAN" | "INSIDENTAL" };
 type Kelas = { id: string; nama: string };
 type Santri = { id: string; nis: string; nama: string };
+type UserOption = { id: string; username: string; active: boolean };
+type MasterDetail = { gender: "L" | "P" | null; kelasId: string | null; santriId: string | null; nominal: number };
 
 type Master = {
   id: string;
+  namaTagihan: string | null;
   targetType: TargetType;
   status: Status;
   autoGenerateEnabled: boolean;
+  picMode: "GLOBAL" | "BY_GENDER" | "BY_KELAS";
+  picGlobalUserId: string | null;
+  picPutraUserId: string | null;
+  picPutriUserId: string | null;
+  picKelas: Array<{
+    kelasId: string;
+    picUserId: string | null;
+    kelas: { id: string; nama: string };
+    picUser: { id: string; username: string; active: boolean } | null;
+  }>;
   nominalGlobal: number | null;
   startBulan: number | null;
   startTahun: number | null;
   endBulan: number | null;
   endTahun: number | null;
   lastGeneratedPeriod: string | null;
+  tanggalTerbit: string | null;
   jatuhTempo: string;
+  keterangan: string | null;
+  details: MasterDetail[];
   komponen: Komponen;
 };
 
-type PreviewRes = { targetCount: number; totalNominal: number; periodeKey: string };
+type PreviewRes = {
+  targetCount: number;
+  totalNominal: number;
+  totalNominalAwal: number;
+  totalDiskon: number;
+  periodeKey: string;
+  skippedDuplicateCount: number;
+  previewLimit: number;
+  preview: Array<{
+    santriId: string;
+    nis: string;
+    nama: string;
+    nominalAwal: number;
+    persentaseDiskon: number;
+    nominalDiskon: number;
+    nominalAkhir: number;
+    kategoriDiskon: { id: string; kode: string; nama: string } | null;
+    picUserId: string | null;
+    picUsername: string | null;
+  }>;
+};
+
+function toDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function defaultJatuhTempoBulanan(base: Date): string {
+  return toDateInputValue(new Date(base.getFullYear(), base.getMonth(), 10));
+}
+
+function defaultJatuhTempoInsidental(base: Date): string {
+  const next30Days = new Date(base.getFullYear(), base.getMonth(), base.getDate() + 30);
+  return toDateInputValue(next30Days);
+}
 
 export default function TagihanMasterPage() {
   const now = new Date();
   const [komponen, setKomponen] = useState<Komponen[]>([]);
   const [kelas, setKelas] = useState<Kelas[]>([]);
   const [santri, setSantri] = useState<Santri[]>([]);
+  const [users, setUsers] = useState<UserOption[]>([]);
   const [rows, setRows] = useState<Master[]>([]);
 
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   const [komponenId, setKomponenId] = useState("");
+  const [namaTagihan, setNamaTagihan] = useState("");
   const [targetType, setTargetType] = useState<TargetType>("SEMUA_SANTRI");
   const [autoGenerateEnabled, setAutoGenerateEnabled] = useState(true);
+  const [picMode, setPicMode] = useState<"GLOBAL" | "BY_GENDER" | "BY_KELAS">("GLOBAL");
+  const [picGlobalUserId, setPicGlobalUserId] = useState("");
+  const [picPutraUserId, setPicPutraUserId] = useState("");
+  const [picPutriUserId, setPicPutriUserId] = useState("");
+  const [picKelasUser, setPicKelasUser] = useState<Record<string, string>>({});
   const [nominalGlobal, setNominalGlobal] = useState("100000");
   const [nominalL, setNominalL] = useState("100000");
   const [nominalP, setNominalP] = useState("100000");
@@ -49,7 +108,7 @@ export default function TagihanMasterPage() {
   const [endBulan, setEndBulan] = useState("12");
   const [endTahun, setEndTahun] = useState("2100");
 
-  const [tanggalTerbit, setTanggalTerbit] = useState(now.toISOString().slice(0, 10));
+  const [tanggalTerbit, setTanggalTerbit] = useState(toDateInputValue(now));
   const [jatuhTempo, setJatuhTempo] = useState("");
   const [keterangan, setKeterangan] = useState("");
 
@@ -58,6 +117,7 @@ export default function TagihanMasterPage() {
   const [previewYear, setPreviewYear] = useState(String(now.getFullYear()));
   const [preview, setPreview] = useState<PreviewRes | null>(null);
   const [confirmGenerate, setConfirmGenerate] = useState(false);
+  const [editingId, setEditingId] = useState("");
 
   const selectedKomponen = useMemo(
     () => komponen.find((k) => k.id === komponenId) || null,
@@ -70,37 +130,51 @@ export default function TagihanMasterPage() {
   );
 
   async function loadMaster() {
-    const [kRes, klRes, sRes, mRes] = await Promise.all([
+    const [kRes, klRes, sRes, uRes, mRes] = await Promise.all([
       fetch("/api/komponen-tagihan?page=1&pageSize=500"),
       fetch("/api/kelas?page=1&pageSize=500"),
       fetch("/api/santri?page=1&pageSize=1000"),
+      fetch("/api/users?page=1&pageSize=500&active=true"),
       fetch("/api/tagihan-master?page=1&pageSize=50"),
     ]);
 
-    const [kJson, klJson, sJson, mJson] = await Promise.all([
+    const [kJson, klJson, sJson, uJson, mJson] = await Promise.all([
       kRes.json(),
       klRes.json(),
       sRes.json(),
+      uRes.json(),
       mRes.json(),
     ]);
 
     if (!kRes.ok) throw new Error(kJson.message || "Gagal load komponen");
     if (!klRes.ok) throw new Error(klJson.message || "Gagal load kelas");
     if (!sRes.ok) throw new Error(sJson.message || "Gagal load santri");
+    if (!uRes.ok) throw new Error(uJson.message || "Gagal load user aktif");
     if (!mRes.ok) throw new Error(mJson.message || "Gagal load master tagihan");
 
     setKomponen(kJson.data);
     setKelas(klJson.data);
     setSantri(sJson.data);
+    setUsers(uJson.data);
     setRows(mJson.data);
 
     if (!komponenId && kJson.data[0]) setKomponenId(kJson.data[0].id);
 
     const nextKelasNominal: Record<string, string> = {};
+    const nextPicKelas: Record<string, string> = {};
     klJson.data.forEach((k: Kelas) => {
       nextKelasNominal[k.id] = kelasNominal[k.id] || "100000";
+      nextPicKelas[k.id] = picKelasUser[k.id] || "";
     });
     setKelasNominal(nextKelasNominal);
+    setPicKelasUser(nextPicKelas);
+
+    if (!picGlobalUserId && uJson.data[0]) {
+      setPicGlobalUserId(uJson.data[0].id);
+      setPicPutraUserId(uJson.data[0].id);
+      setPicPutriUserId(uJson.data[0].id);
+      setPicKelasUser(Object.fromEntries(klJson.data.map((k: Kelas) => [k.id, uJson.data[0].id])));
+    }
   }
 
   useEffect(() => {
@@ -109,6 +183,124 @@ export default function TagihanMasterPage() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (editingId) return;
+    if (selectedKomponen?.tipe === "BULANAN") {
+      setJatuhTempo(defaultJatuhTempoBulanan(new Date()));
+      return;
+    }
+    if (selectedKomponen?.tipe === "INSIDENTAL") {
+      setJatuhTempo(defaultJatuhTempoInsidental(new Date()));
+    }
+  }, [selectedKomponen?.tipe, editingId]);
+
+  function resetForm() {
+    const baseKelasNominal: Record<string, string> = {};
+    kelas.forEach((k) => {
+      baseKelasNominal[k.id] = "100000";
+    });
+
+    setEditingId("");
+    setNamaTagihan("");
+    setTargetType("SEMUA_SANTRI");
+    setAutoGenerateEnabled(true);
+    setPicMode("GLOBAL");
+    const firstUserId = users[0]?.id || "";
+    setPicGlobalUserId(firstUserId);
+    setPicPutraUserId(firstUserId);
+    setPicPutriUserId(firstUserId);
+    setPicKelasUser(Object.fromEntries(kelas.map((k) => [k.id, firstUserId])));
+    setNominalGlobal("100000");
+    setNominalL("100000");
+    setNominalP("100000");
+    setKelasNominal(baseKelasNominal);
+    setSpesifik([]);
+    setStartBulan(String(now.getMonth() + 1));
+    setStartTahun(String(now.getFullYear()));
+    setEndBulan("12");
+    setEndTahun("2100");
+    setTanggalTerbit(toDateInputValue(now));
+    if (selectedKomponen?.tipe === "BULANAN") {
+      setJatuhTempo(defaultJatuhTempoBulanan(now));
+    } else {
+      setJatuhTempo(defaultJatuhTempoInsidental(now));
+    }
+    setKeterangan("");
+  }
+
+  function onEdit(master: Master) {
+    setEditingId(master.id);
+    setKomponenId(master.komponen.id);
+    setNamaTagihan(master.namaTagihan || "");
+    setTargetType(master.targetType);
+    setAutoGenerateEnabled(master.autoGenerateEnabled);
+    setPicMode(master.picMode || "GLOBAL");
+    setPicGlobalUserId(master.picGlobalUserId || "");
+    setPicPutraUserId(master.picPutraUserId || "");
+    setPicPutriUserId(master.picPutriUserId || "");
+    const kelasPicMap: Record<string, string> = {};
+    kelas.forEach((k) => {
+      const found = master.picKelas.find((item) => item.kelasId === k.id);
+      kelasPicMap[k.id] = found?.picUserId || "";
+    });
+    setPicKelasUser(kelasPicMap);
+    setNominalGlobal(String(master.nominalGlobal || 0));
+    setStartBulan(String(master.startBulan || now.getMonth() + 1));
+    setStartTahun(String(master.startTahun || now.getFullYear()));
+    setEndBulan(String(master.endBulan || 12));
+    setEndTahun(String(master.endTahun || 2100));
+    setTanggalTerbit(master.tanggalTerbit ? toDateInputValue(new Date(master.tanggalTerbit)) : toDateInputValue(now));
+    setJatuhTempo(toDateInputValue(new Date(master.jatuhTempo)));
+    setKeterangan(master.keterangan || "");
+
+    if (master.targetType === "GENDER") {
+      const nominalByGender = new Map(master.details.filter((d) => d.gender).map((d) => [d.gender, d.nominal]));
+      setNominalL(String(nominalByGender.get("L") || 0));
+      setNominalP(String(nominalByGender.get("P") || 0));
+    }
+
+    if (master.targetType === "KELAS") {
+      const nominalByKelas = new Map(master.details.filter((d) => d.kelasId).map((d) => [d.kelasId as string, d.nominal]));
+      const nextKelasNominal: Record<string, string> = {};
+      kelas.forEach((k) => {
+        nextKelasNominal[k.id] = String(nominalByKelas.get(k.id) || 0);
+      });
+      setKelasNominal(nextKelasNominal);
+    }
+
+    if (master.targetType === "SPESIFIK_SANTRI") {
+      setSpesifik(master.details.filter((d) => d.santriId).map((d) => ({
+        santriId: d.santriId as string,
+        nominal: String(d.nominal),
+      })));
+    } else {
+      setSpesifik([]);
+    }
+
+    setPreview(null);
+    setMessage("Mode edit aktif");
+  }
+
+  async function onDelete(id: string) {
+    const ok = window.confirm("Hapus master tagihan ini?");
+    if (!ok) return;
+
+    setMessage("");
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/tagihan-master/${id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Gagal menghapus master tagihan");
+      if (editingId === id) resetForm();
+      setMessage("Master tagihan berhasil dihapus");
+      await loadMaster();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Terjadi kesalahan");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function addSpesifikRow() {
     if (!santri[0]) return;
@@ -137,37 +329,53 @@ export default function TagihanMasterPage() {
     return spesifik.map((s) => ({ santriId: s.santriId, nominal: Number(s.nominal) }));
   }
 
-  async function onCreate(e: FormEvent<HTMLFormElement>) {
+  async function onSubmitMaster(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setMessage("");
     setLoading(true);
 
     try {
+      const resolvedJatuhTempo = jatuhTempo || (
+        selectedKomponen?.tipe === "BULANAN"
+          ? defaultJatuhTempoBulanan(new Date())
+          : defaultJatuhTempoInsidental(new Date())
+      );
       const payload = {
         komponenId,
+        namaTagihan,
         targetType,
         autoGenerateEnabled,
+        picMode,
+        picGlobalUserId: picGlobalUserId || null,
+        picPutraUserId: picPutraUserId || null,
+        picPutriUserId: picPutriUserId || null,
+        picKelas: kelas.map((k) => ({ kelasId: k.id, picUserId: picKelasUser[k.id] || null })),
         nominalGlobal: targetType === "SEMUA_SANTRI" ? Number(nominalGlobal) : null,
         startBulan: selectedKomponen?.tipe === "BULANAN" ? Number(startBulan) : null,
         startTahun: selectedKomponen?.tipe === "BULANAN" ? Number(startTahun) : null,
         endBulan: selectedKomponen?.tipe === "BULANAN" ? Number(endBulan) : null,
         endTahun: selectedKomponen?.tipe === "BULANAN" ? Number(endTahun) : null,
         tanggalTerbit: selectedKomponen?.tipe === "INSIDENTAL" ? tanggalTerbit : null,
-        jatuhTempo,
+        jatuhTempo: resolvedJatuhTempo,
         keterangan,
         details: buildDetails(),
       };
 
-      const res = await fetch("/api/tagihan-master", {
-        method: "POST",
+      const method = editingId ? "PUT" : "POST";
+      const endpoint = editingId ? `/api/tagihan-master/${editingId}` : "/api/tagihan-master";
+      const res = await fetch(endpoint, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       const json = await res.json();
-      if (!res.ok) throw new Error(json.message || "Gagal membuat master tagihan");
+      if (!res.ok) {
+        throw new Error(json.message || (editingId ? "Gagal mengubah master tagihan" : "Gagal membuat master tagihan"));
+      }
 
-      setMessage("Master tagihan berhasil disimpan");
+      setMessage(editingId ? "Master tagihan berhasil diperbarui" : "Master tagihan berhasil disimpan");
+      resetForm();
       await loadMaster();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Terjadi kesalahan");
@@ -243,13 +451,22 @@ export default function TagihanMasterPage() {
         Bulanan: 1 master untuk rentang start-end bulan. Auto generate tanggal 1 (WIB) bisa ON/OFF.
       </p>
 
-      <form className="form-grid" onSubmit={onCreate}>
+      <form className="form-grid" onSubmit={onSubmitMaster}>
         <label htmlFor="komponen">Komponen</label>
         <select id="komponen" value={komponenId} onChange={(e) => setKomponenId(e.target.value)}>
           {komponen.map((k) => (
             <option key={k.id} value={k.id}>{k.kode} - {k.nama} ({k.tipe})</option>
           ))}
         </select>
+
+        <label htmlFor="namaTagihan">Nama Tagihan</label>
+        <input
+          id="namaTagihan"
+          value={namaTagihan}
+          onChange={(e) => setNamaTagihan(e.target.value)}
+          placeholder="Contoh: Syahriyyah Reguler"
+          required
+        />
 
         <label htmlFor="targetType">Target Tagihan</label>
         <select id="targetType" value={targetType} onChange={(e) => setTargetType(e.target.value as TargetType)}>
@@ -267,6 +484,61 @@ export default function TagihanMasterPage() {
           />
           Auto Generate ON (tanggal 1 WIB)
         </label>
+
+        <label htmlFor="picMode">Mode PIC</label>
+        <select id="picMode" value={picMode} onChange={(e) => setPicMode(e.target.value as "GLOBAL" | "BY_GENDER" | "BY_KELAS")}>
+          <option value="GLOBAL">1 PIC untuk semua</option>
+          <option value="BY_GENDER">Beda PIC per gender</option>
+          <option value="BY_KELAS">Beda PIC per kelas</option>
+        </select>
+
+        <label htmlFor="picGlobalUserId">PIC Global (fallback)</label>
+        <select id="picGlobalUserId" value={picGlobalUserId} onChange={(e) => setPicGlobalUserId(e.target.value)}>
+          <option value="">- tidak diisi -</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>{u.username}</option>
+          ))}
+        </select>
+
+        {picMode === "BY_GENDER" ? (
+          <>
+            <label htmlFor="picPutraUserId">PIC Putra</label>
+            <select id="picPutraUserId" value={picPutraUserId} onChange={(e) => setPicPutraUserId(e.target.value)}>
+              <option value="">- tidak diisi -</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>{u.username}</option>
+              ))}
+            </select>
+
+            <label htmlFor="picPutriUserId">PIC Putri</label>
+            <select id="picPutriUserId" value={picPutriUserId} onChange={(e) => setPicPutriUserId(e.target.value)}>
+              <option value="">- tidak diisi -</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>{u.username}</option>
+              ))}
+            </select>
+          </>
+        ) : null}
+
+        {picMode === "BY_KELAS" ? (
+          <div className="stack-block">
+            <strong>PIC per Kelas</strong>
+            {kelas.map((k) => (
+              <div key={k.id} className="row-inline">
+                <span>{k.nama}</span>
+                <select
+                  value={picKelasUser[k.id] || ""}
+                  onChange={(e) => setPicKelasUser((prev) => ({ ...prev, [k.id]: e.target.value }))}
+                >
+                  <option value="">- fallback global/null -</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>{u.username}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         {targetType === "SEMUA_SANTRI" ? (
           <>
@@ -354,7 +626,10 @@ export default function TagihanMasterPage() {
         <input id="keterangan" value={keterangan} onChange={(e) => setKeterangan(e.target.value)} />
 
         <div className="row-actions">
-          <button type="submit" disabled={loading}>{loading ? "Menyimpan..." : "Simpan Master"}</button>
+          <button type="submit" disabled={loading}>{loading ? "Menyimpan..." : editingId ? "Update Master" : "Simpan Master"}</button>
+          {editingId ? (
+            <button type="button" onClick={resetForm} disabled={loading}>Batal Edit</button>
+          ) : null}
         </div>
       </form>
 
@@ -367,7 +642,9 @@ export default function TagihanMasterPage() {
         <select id="selectedMaster" value={selectedMasterId} onChange={(e) => setSelectedMasterId(e.target.value)}>
           <option value="">- pilih -</option>
           {rows.filter((r) => r.status !== "ENDED").map((r) => (
-            <option key={r.id} value={r.id}>{r.komponen.kode} - {r.targetType} ({r.status})</option>
+            <option key={r.id} value={r.id}>
+              {r.namaTagihan || `${r.komponen.kode} - ${r.komponen.nama}`} ({r.status})
+            </option>
           ))}
         </select>
 
@@ -385,8 +662,43 @@ export default function TagihanMasterPage() {
         </div>
 
         {preview ? (
-          <div className="hint-text">
-            Target: {preview.targetCount} santri | Total: {preview.totalNominal} | Periode: {preview.periodeKey}
+          <div className="stack-block">
+            <div className="hint-text">
+              Target: {preview.targetCount} santri | Awal: {preview.totalNominalAwal} | Diskon: {preview.totalDiskon} | Akhir: {preview.totalNominal} | Periode: {preview.periodeKey}
+            </div>
+            <div className="hint-text">
+              Menampilkan {preview.preview.length} dari {preview.targetCount} calon tagihan (duplikat dilewati: {preview.skippedDuplicateCount})
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>NIS</th>
+                    <th>Nama Santri</th>
+                    <th>Nominal Awal</th>
+                    <th>Diskon%</th>
+                    <th>Potongan</th>
+                    <th>Nominal Akhir</th>
+                    <th>Kategori</th>
+                    <th>PIC</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.preview.map((row) => (
+                    <tr key={row.santriId}>
+                      <td>{row.nis}</td>
+                      <td>{row.nama}</td>
+                      <td>{row.nominalAwal}</td>
+                      <td>{row.persentaseDiskon}</td>
+                      <td>{row.nominalDiskon}</td>
+                      <td>{row.nominalAkhir}</td>
+                      <td>{row.kategoriDiskon ? `${row.kategoriDiskon.kode} - ${row.kategoriDiskon.nama}` : "-"}</td>
+                      <td>{row.picUsername || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : null}
 
@@ -404,22 +716,27 @@ export default function TagihanMasterPage() {
         <table>
           <thead>
             <tr>
+              <th>Nama Tagihan</th>
               <th>Komponen</th>
               <th>Target</th>
               <th>Status</th>
               <th>Auto</th>
+              <th>PIC Mode</th>
               <th>Range</th>
               <th>Last Generated</th>
               <th>Jatuh Tempo</th>
+              <th>Aksi</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
+                <td>{r.namaTagihan || "-"}</td>
                 <td>{r.komponen.kode} - {r.komponen.nama}</td>
                 <td>{r.targetType}</td>
                 <td>{r.status}</td>
                 <td>{r.autoGenerateEnabled ? "ON" : "OFF"}</td>
+                <td>{r.picMode}</td>
                 <td>
                   {r.komponen.tipe === "BULANAN"
                     ? `${r.startBulan}/${r.startTahun} - ${r.endBulan}/${r.endTahun}`
@@ -427,10 +744,16 @@ export default function TagihanMasterPage() {
                 </td>
                 <td>{r.lastGeneratedPeriod || "-"}</td>
                 <td>{new Date(r.jatuhTempo).toISOString().slice(0, 10)}</td>
+                <td>
+                  <div className="row-actions">
+                    <button type="button" onClick={() => onEdit(r)} disabled={loading || r.status === "ENDED"}>Edit</button>
+                    <button type="button" className="btn-danger" onClick={() => onDelete(r.id)} disabled={loading}>Hapus</button>
+                  </div>
+                </td>
               </tr>
             ))}
             {!rows.length ? (
-              <tr><td colSpan={7}>Belum ada master tagihan</td></tr>
+              <tr><td colSpan={10}>Belum ada master tagihan</td></tr>
             ) : null}
           </tbody>
         </table>

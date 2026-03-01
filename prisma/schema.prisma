@@ -62,10 +62,27 @@ enum TagihanMasterStatus {
 }
 
 enum TagihanStatus {
+  DRAFT
   TERBIT
   SEBAGIAN
   LUNAS
   BATAL
+}
+
+enum PaymentMethod {
+  TUNAI
+  TRANSFER
+}
+
+enum KwitansiTemplate {
+  RINGKAS
+  LENGKAP
+}
+
+enum TagihanPicMode {
+  GLOBAL
+  BY_GENDER
+  BY_KELAS
 }
 
 model User {
@@ -74,8 +91,15 @@ model User {
   passwordHash String
   role         UserRole @default(ADMIN)
   active       Boolean  @default(true)
+  isDeleted    Boolean  @default(false)
+  deletedAt    DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  tagihanMasterPicGlobal TagihanMaster[] @relation("TagihanMasterPicGlobal")
+  tagihanMasterPicPutra  TagihanMaster[] @relation("TagihanMasterPicPutra")
+  tagihanMasterPicPutri  TagihanMaster[] @relation("TagihanMasterPicPutri")
+  tagihanMasterPicKelas  TagihanMasterPicKelas[]
+  tagihanPic             Tagihan[]       @relation("TagihanPicUser")
 }
 
 model Kelas {
@@ -87,6 +111,7 @@ model Kelas {
   santri    Santri[]
   ruleTagihan RuleTagihan[]
   tagihanMasterDetail TagihanMasterDetail[]
+  tagihanMasterPicKelas TagihanMasterPicKelas[]
 }
 
 model Keluarga {
@@ -180,9 +205,14 @@ model RuleTagihan {
 model TagihanMaster {
   id                   String              @id @default(cuid())
   komponenId           String
+  namaTagihan          String?
   targetType           TargetTagihanType
   status               TagihanMasterStatus @default(SCHEDULED)
   autoGenerateEnabled  Boolean             @default(true)
+  picMode              TagihanPicMode      @default(GLOBAL)
+  picGlobalUserId      String?
+  picPutraUserId       String?
+  picPutriUserId       String?
   nominalGlobal        Float?
   startBulan           Int?
   startTahun           Int?
@@ -196,9 +226,28 @@ model TagihanMaster {
   updatedAt            DateTime            @updatedAt
 
   komponen             KomponenTagihan      @relation(fields: [komponenId], references: [id])
+  picGlobalUser        User?               @relation("TagihanMasterPicGlobal", fields: [picGlobalUserId], references: [id])
+  picPutraUser         User?               @relation("TagihanMasterPicPutra", fields: [picPutraUserId], references: [id])
+  picPutriUser         User?               @relation("TagihanMasterPicPutri", fields: [picPutriUserId], references: [id])
   details         TagihanMasterDetail[]
+  picKelas        TagihanMasterPicKelas[]
   tagihan         Tagihan[]
   generateLogs    TagihanGenerateLog[]
+}
+
+model TagihanMasterPicKelas {
+  id          String       @id @default(cuid())
+  masterId    String
+  kelasId     String
+  picUserId   String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  master      TagihanMaster @relation(fields: [masterId], references: [id], onDelete: Cascade)
+  kelas       Kelas         @relation(fields: [kelasId], references: [id])
+  picUser     User?         @relation(fields: [picUserId], references: [id])
+
+  @@unique([masterId, kelasId])
 }
 
 model TagihanMasterDetail {
@@ -222,7 +271,11 @@ model Tagihan {
   santriId      String
   komponenId    String
   periodeKey    String
+  nominalAwal   Float        @default(0)
+  nominalDiskon Float        @default(0)
   nominal       Float
+  nominalTerbayar Float      @default(0)
+  picUserId      String?
   jatuhTempo    DateTime
   status        TagihanStatus @default(TERBIT)
   createdAt     DateTime      @default(now())
@@ -231,6 +284,8 @@ model Tagihan {
   master        TagihanMaster @relation(fields: [masterId], references: [id])
   santri        Santri        @relation(fields: [santriId], references: [id])
   komponen      KomponenTagihan @relation(fields: [komponenId], references: [id])
+  picUser       User?          @relation("TagihanPicUser", fields: [picUserId], references: [id])
+  pembayaran    Pembayaran[]
 
   @@unique([santriId, komponenId, periodeKey])
 }
@@ -248,4 +303,32 @@ model TagihanGenerateLog {
   createdAt     DateTime @default(now())
 
   master        TagihanMaster @relation(fields: [masterId], references: [id], onDelete: Cascade)
+}
+
+model Pembayaran {
+  id            String        @id @default(cuid())
+  tagihanId     String
+  tanggalBayar  DateTime      @default(now())
+  nominal       Float
+  metode        PaymentMethod
+  referensi     String?
+  adminUsername String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  tagihan       Tagihan       @relation(fields: [tagihanId], references: [id], onDelete: Cascade)
+  kwitansi      Kwitansi?
+}
+
+model Kwitansi {
+  id            String           @id @default(cuid())
+  nomor         String           @unique
+  pembayaranId  String           @unique
+  template      KwitansiTemplate @default(LENGKAP)
+  adminUsername String
+  logoUrl       String?
+  stempelUrl    String?
+  createdAt     DateTime         @default(now())
+
+  pembayaran    Pembayaran       @relation(fields: [pembayaranId], references: [id], onDelete: Cascade)
 }

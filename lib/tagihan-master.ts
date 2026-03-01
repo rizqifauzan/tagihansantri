@@ -4,6 +4,7 @@ export type MasterStatus = "SCHEDULED" | "ACTIVE" | "ENDED" | "INACTIVE";
 
 export type MasterInput = {
   komponenId: string;
+  namaTagihan?: string | null;
   targetType: TargetTagihanType;
   nominalGlobal?: number | null;
   startBulan?: number | null;
@@ -52,6 +53,25 @@ export function toInsidentalPeriodKey(tanggalTerbit: Date | null, jatuhTempo: Da
   return `INS:${terbit}:${jt}`;
 }
 
+export function toMonthlyDueDate(baseDueDate: Date, month: number, year: number): Date {
+  const dueDay = baseDueDate.getUTCDate();
+  const maxDayInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const clampedDay = Math.min(dueDay, maxDayInMonth);
+  return new Date(Date.UTC(year, month - 1, clampedDay));
+}
+
+function getWibMonthYear(date: Date): { month: number; year: number } {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+  });
+  const parts = fmt.formatToParts(date);
+  const year = Number(parts.find((p) => p.type === "year")?.value || "0");
+  const month = Number(parts.find((p) => p.type === "month")?.value || "0");
+  return { month, year };
+}
+
 export function determineMonthlyStatus(input: {
   startBulan: number;
   startTahun: number;
@@ -74,6 +94,9 @@ export function determineMonthlyStatus(input: {
 
 export async function validateMasterInput(input: MasterInput): Promise<string | null> {
   if (!input.komponenId) return "Komponen wajib dipilih";
+  if (!input.namaTagihan || !String(input.namaTagihan).trim()) {
+    return "Nama tagihan wajib diisi";
+  }
   if (!input.jatuhTempo || Number.isNaN(input.jatuhTempo.getTime())) {
     return "Jatuh tempo tidak valid";
   }
@@ -141,28 +164,45 @@ export async function resolveTargetSantri(master: {
   targetType: TargetTagihanType;
   nominalGlobal: number | null;
   details: Array<{ gender: Gender | null; kelasId: string | null; santriId: string | null; nominal: number }>;
+  periodMonth?: number | null;
+  periodYear?: number | null;
 }) {
-  const aktifSantri = await prisma.santri.findMany({
-    where: { status: SantriStatus.AKTIF },
-    select: { id: true, gender: true, kelasId: true },
+  const monthlyPeriod = master.periodMonth && master.periodYear
+    ? { month: master.periodMonth, year: master.periodYear }
+    : null;
+
+  const kandidatSantri = await prisma.santri.findMany({
+    where: {
+      status: {
+        in: monthlyPeriod ? [SantriStatus.AKTIF, SantriStatus.KELUAR] : [SantriStatus.AKTIF],
+      },
+    },
+    select: { id: true, gender: true, kelasId: true, status: true, tanggalKeluar: true },
+  });
+
+  const targetSantri = kandidatSantri.filter((s) => {
+    if (s.status === SantriStatus.AKTIF) return true;
+    if (!monthlyPeriod || s.status !== SantriStatus.KELUAR || !s.tanggalKeluar) return false;
+    const { month: keluarMonth, year: keluarYear } = getWibMonthYear(s.tanggalKeluar);
+    return keluarMonth === monthlyPeriod.month && keluarYear === monthlyPeriod.year;
   });
 
   if (master.targetType === TargetTagihanType.SEMUA_SANTRI) {
-    return aktifSantri.map((s) => ({ santriId: s.id, nominal: master.nominalGlobal || 0 }));
+    return targetSantri.map((s) => ({ santriId: s.id, nominal: master.nominalGlobal || 0 }));
   }
 
   if (master.targetType === TargetTagihanType.GENDER) {
     const byGender = new Map(master.details.filter((d) => d.gender).map((d) => [d.gender as Gender, d.nominal]));
-    return aktifSantri.filter((s) => byGender.has(s.gender)).map((s) => ({ santriId: s.id, nominal: byGender.get(s.gender) || 0 }));
+    return targetSantri.filter((s) => byGender.has(s.gender)).map((s) => ({ santriId: s.id, nominal: byGender.get(s.gender) || 0 }));
   }
 
   if (master.targetType === TargetTagihanType.KELAS) {
     const byKelas = new Map(master.details.filter((d) => d.kelasId).map((d) => [d.kelasId as string, d.nominal]));
-    return aktifSantri.filter((s) => byKelas.has(s.kelasId)).map((s) => ({ santriId: s.id, nominal: byKelas.get(s.kelasId) || 0 }));
+    return targetSantri.filter((s) => byKelas.has(s.kelasId)).map((s) => ({ santriId: s.id, nominal: byKelas.get(s.kelasId) || 0 }));
   }
 
   const bySantri = new Map(master.details.filter((d) => d.santriId).map((d) => [d.santriId as string, d.nominal]));
-  return aktifSantri.filter((s) => bySantri.has(s.id)).map((s) => ({ santriId: s.id, nominal: bySantri.get(s.id) || 0 }));
+  return targetSantri.filter((s) => bySantri.has(s.id)).map((s) => ({ santriId: s.id, nominal: bySantri.get(s.id) || 0 }));
 }
 
 export async function existingSantriIdsForPeriod(input: { komponenId: string; periodeKey: string; santriIds: string[] }) {

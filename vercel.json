@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/tagihan-master/auto-run",
+      "schedule": "5 17 * * *"
+    }
+  ]
+}

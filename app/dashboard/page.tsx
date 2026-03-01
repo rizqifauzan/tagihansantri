@@ -7,6 +7,9 @@ export default function DashboardPage() {
       <p>Pilih modul untuk mengelola master data Sprint 1.</p>
       <ul>
         <li>
+          <Link href="/dashboard/users">CRUD User</Link>
+        </li>
+        <li>
           <Link href="/dashboard/kelas">CRUD Kelas</Link>
         </li>
         <li>
@@ -32,6 +35,15 @@ export default function DashboardPage() {
         </li>
         <li>
           <Link href="/dashboard/tagihan-master">Pembuatan Tagihan (Semua/Gender/Kelas/Spesifik)</Link>
+        </li>
+        <li>
+          <Link href="/dashboard/tagihan">Lifecycle Tagihan per Santri</Link>
+        </li>
+        <li>
+          <Link href="/dashboard/tagihan-matrix">Semua Tagihan (Matrix per Santri)</Link>
+        </li>
+        <li>
+          <Link href="/dashboard/pembayaran">Pembayaran, Cicilan, Kwitansi</Link>
         </li>
       </ul>
     </section>

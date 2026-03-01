@@ -12,14 +12,19 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push --skip-generate",
     "db:migrate": "prisma migrate dev --skip-generate",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:reset": "node scripts/reset-db.js",
+    "db:reset:seed": "node scripts/reset-db.js --seed",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:backfill-zero-lunas": "node scripts/backfill-zero-tagihan-lunas.js",
+    "db:backfill-tagihan-snapshot": "node scripts/backfill-tagihan-nominal-snapshot.js"
   },
   "dependencies": {
     "@prisma/client": "^6.4.1",
+    "bcryptjs": "^2.4.3",
+    "codex": "^0.2.3",
     "next": "15.2.0",
     "react": "19.0.0",
-    "react-dom": "19.0.0",
-    "bcryptjs": "^2.4.3"
+    "react-dom": "19.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",

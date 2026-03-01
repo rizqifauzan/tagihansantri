@@ -3,4 +3,6 @@ export const env = {
   sessionSecret: process.env.SESSION_SECRET || "dev-secret-change-me",
   adminUsername: process.env.ADMIN_USERNAME || "admin",
   adminPassword: process.env.ADMIN_PASSWORD || "admin123",
+  receiptLogoUrl: process.env.RECEIPT_LOGO_URL || "",
+  receiptStampUrl: process.env.RECEIPT_STAMP_URL || "",
 };

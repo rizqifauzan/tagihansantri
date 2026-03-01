@@ -29,6 +29,7 @@ export default async function DashboardLayout({
 
       <nav className="dashboard-nav">
         <Link href="/dashboard">Home</Link>
+        <Link href="/dashboard/users">Manajemen User</Link>
         <Link href="/dashboard/kelas">Master Kelas</Link>
         <Link href="/dashboard/keluarga">Master Keluarga</Link>
         <Link href="/dashboard/santri">Master Santri</Link>
@@ -38,6 +39,9 @@ export default async function DashboardLayout({
         <Link href="/dashboard/simulasi-diskon">Simulasi Diskon</Link>
         <Link href="/dashboard/rule-tagihan">Rule Tagihan</Link>
         <Link href="/dashboard/tagihan-master">Pembuatan Tagihan</Link>
+        <Link href="/dashboard/tagihan">Tagihan per Santri</Link>
+        <Link href="/dashboard/tagihan-matrix">Semua Tagihan Matrix</Link>
+        <Link href="/dashboard/pembayaran">Pembayaran & Kwitansi</Link>
       </nav>
 
       {children}

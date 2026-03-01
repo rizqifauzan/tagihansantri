@@ -11,6 +11,9 @@ import {
 
 const VALID_TARGET = new Set(Object.values(TargetTagihanType));
 const VALID_GENDER = new Set(Object.values(Gender));
+const PIC_MODES = ["GLOBAL", "BY_GENDER", "BY_KELAS"] as const;
+type TagihanPicModeValue = (typeof PIC_MODES)[number];
+const VALID_PIC_MODE = new Set<string>(PIC_MODES);
 
 function getWibMonthYear() {
   const fmt = new Intl.DateTimeFormat("en-CA", {
@@ -33,6 +36,7 @@ export async function GET(req: NextRequest) {
   const where = q
     ? {
         OR: [
+          { namaTagihan: { contains: q, mode: "insensitive" } },
           { komponen: { nama: { contains: q, mode: "insensitive" } } },
           { komponen: { kode: { contains: q, mode: "insensitive" } } },
           { keterangan: { contains: q, mode: "insensitive" } },
@@ -49,6 +53,15 @@ export async function GET(req: NextRequest) {
       take: pageSize,
       include: {
         komponen: { select: { id: true, kode: true, nama: true, tipe: true } },
+        picGlobalUser: { select: { id: true, username: true, active: true } },
+        picPutraUser: { select: { id: true, username: true, active: true } },
+        picPutriUser: { select: { id: true, username: true, active: true } },
+        picKelas: {
+          include: {
+            kelas: { select: { id: true, nama: true } },
+            picUser: { select: { id: true, username: true, active: true } },
+          },
+        },
         details: true,
       },
     }),
@@ -87,6 +100,7 @@ export async function POST(req: NextRequest) {
 
   const input = {
     komponenId: String(body?.komponenId || "").trim(),
+    namaTagihan: String(body?.namaTagihan || "").trim() || null,
     targetType,
     nominalGlobal:
       body?.nominalGlobal === null || body?.nominalGlobal === undefined
@@ -97,6 +111,16 @@ export async function POST(req: NextRequest) {
     endBulan: body?.endBulan ? Number(body.endBulan) : null,
     endTahun: body?.endTahun ? Number(body.endTahun) : null,
     autoGenerateEnabled: Boolean(body?.autoGenerateEnabled ?? true),
+    picMode: String(body?.picMode || "GLOBAL").trim() as TagihanPicModeValue,
+    picGlobalUserId: String(body?.picGlobalUserId || "").trim() || null,
+    picPutraUserId: String(body?.picPutraUserId || "").trim() || null,
+    picPutriUserId: String(body?.picPutriUserId || "").trim() || null,
+    picKelas: Array.isArray(body?.picKelas)
+      ? body.picKelas.map((item: any) => ({
+          kelasId: String(item?.kelasId || "").trim(),
+          picUserId: String(item?.picUserId || "").trim() || null,
+        }))
+      : [],
     tanggalTerbit: toOptionalDate(body?.tanggalTerbit),
     jatuhTempo: toOptionalDate(body?.jatuhTempo),
     keterangan: String(body?.keterangan || "").trim() || null,
@@ -105,6 +129,31 @@ export async function POST(req: NextRequest) {
 
   if (!input.jatuhTempo) {
     return NextResponse.json({ message: "Jatuh tempo wajib diisi" }, { status: 400 });
+  }
+  if (!VALID_PIC_MODE.has(input.picMode)) {
+    return NextResponse.json({ message: "Mode PIC tidak valid" }, { status: 400 });
+  }
+
+  const picUserIds = Array.from(
+    new Set(
+      [
+        input.picGlobalUserId,
+        input.picPutraUserId,
+        input.picPutriUserId,
+        ...input.picKelas.map((item: { picUserId: string | null }) => item.picUserId),
+      ].filter(Boolean) as string[],
+    ),
+  );
+  if (picUserIds.length) {
+    const activeUsers = await db.user.findMany({
+      where: { id: { in: picUserIds }, active: true, isDeleted: false },
+      select: { id: true },
+    });
+    const activeSet = new Set(activeUsers.map((u: { id: string }) => u.id));
+    const invalid = picUserIds.find((id) => !activeSet.has(id));
+    if (invalid) {
+      return NextResponse.json({ message: "PIC harus user aktif" }, { status: 400 });
+    }
   }
 
   const validationError = await validateMasterInput({
@@ -138,9 +187,14 @@ export async function POST(req: NextRequest) {
     const created = await db.tagihanMaster.create({
       data: {
         komponenId: input.komponenId,
+        namaTagihan: input.namaTagihan,
         targetType: input.targetType,
         status: status as any,
         autoGenerateEnabled: input.autoGenerateEnabled,
+        picMode: input.picMode,
+        picGlobalUserId: input.picGlobalUserId,
+        picPutraUserId: input.picPutraUserId,
+        picPutriUserId: input.picPutriUserId,
         nominalGlobal: input.nominalGlobal,
         startBulan: input.startBulan,
         startTahun: input.startTahun,
@@ -149,12 +203,29 @@ export async function POST(req: NextRequest) {
         tanggalTerbit: input.tanggalTerbit,
         jatuhTempo: input.jatuhTempo,
         keterangan: input.keterangan,
+        picKelas: {
+          create: input.picKelas
+            .filter((item: { kelasId: string }) => item.kelasId)
+            .map((item: { kelasId: string; picUserId: string | null }) => ({
+                kelasId: item.kelasId,
+                picUserId: item.picUserId,
+              })),
+        },
         details: {
           create: toDetailCreate(input.targetType, input.details),
         },
       },
       include: {
         komponen: { select: { id: true, kode: true, nama: true, tipe: true } },
+        picGlobalUser: { select: { id: true, username: true, active: true } },
+        picPutraUser: { select: { id: true, username: true, active: true } },
+        picPutriUser: { select: { id: true, username: true, active: true } },
+        picKelas: {
+          include: {
+            kelas: { select: { id: true, nama: true } },
+            picUser: { select: { id: true, username: true, active: true } },
+          },
+        },
         details: true,
       },
     });
