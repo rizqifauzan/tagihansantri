@@ -39,6 +39,10 @@ const groups: NavGroup[] = [
       { label: "Tagihan", href: "/dashboard/tagihan", icon: <Icon path="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5" /> },
       { label: "Pembayaran", href: "/dashboard/pembayaran", icon: <Icon path="M3 7h18v10H3zM3 10h18M8 15h2" /> },
       { label: "Laporan", href: "/dashboard/tagihan-matrix", icon: <Icon path="M4 19h16M7 16V8m5 8V5m5 11v-6" /> },
+      { label: "Laporan V2", href: "/dashboard/tagihan-v2", icon: <Icon path="M4 19h16M7 16V8m5 8V5m5 11v-6M3 3l18 18" /> },
+      { label: "Laporan V3", href: "/tagihan-v3", icon: <Icon path="M15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9M15 3l6 6M15 3v6h6" /> },
+      { label: "Laporan V4", href: "/tagihan-v4", icon: <Icon path="M15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9M15 3l6 6M15 3v6h6M8 13h8M8 17h6" /> },
+      { label: "History V4", href: "/tagihan-v4/history", icon: <Icon path="M12 8v5l3 2M12 3a9 9 0 1 0 9 9 9 9 0 0 0-9-9z" /> },
     ],
   },
   {
@@ -80,6 +84,9 @@ export function DashboardShell({
   }, [profileOpen]);
 
   useEffect(() => {
+    const savedSidebar = window.localStorage.getItem("dashboard-sidebar-collapsed");
+    if (savedSidebar === "1") setCollapsed(true);
+
     const saved = window.localStorage.getItem("dashboard-theme");
     if (saved === "pesantren-modern" || saved === "pesantren-formal") {
       setTheme(saved);
@@ -88,6 +95,10 @@ export function DashboardShell({
     }
     document.documentElement.dataset.theme = "pesantren-formal";
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("dashboard-sidebar-collapsed", collapsed ? "1" : "0");
+  }, [collapsed]);
 
   function onThemeChange(nextTheme: "pesantren-formal" | "pesantren-modern") {
     setTheme(nextTheme);
@@ -111,10 +122,21 @@ export function DashboardShell({
       <main className={`dashboard-layout ${collapsed ? "is-collapsed" : ""}`}>
         <aside className="sidebar">
           <div className="sidebar-top">
-            <button type="button" className="brand" onClick={() => setCollapsed((prev) => !prev)}>
+            <div className="sidebar-head-row">
+            <button type="button" className="brand">
               <span className="brand-mark">{appName.slice(0, 1)}</span>
               {!collapsed ? <strong>{appName}</strong> : null}
             </button>
+            <button
+              type="button"
+              className="sidebar-collapse-btn"
+              onClick={() => setCollapsed((prev) => !prev)}
+              aria-label={collapsed ? "Perlebar menu kiri" : "Kecilkan menu kiri"}
+              title={collapsed ? "Perlebar menu kiri" : "Kecilkan menu kiri"}
+            >
+              {collapsed ? ">>" : "<<"}
+            </button>
+            </div>
 
             <div className="profile" ref={profileRef}>
               <button type="button" className="profile-trigger" onClick={() => setProfileOpen((prev) => !prev)}>
@@ -158,7 +180,13 @@ export function DashboardShell({
                 {group.items.map((item) => {
                   const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                   return (
-                    <Link key={item.href} href={item.href} className={`nav-link ${active ? "is-active" : ""}`}>
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`nav-link ${active ? "is-active" : ""}`}
+                      data-tooltip={collapsed ? item.label : undefined}
+                      aria-label={collapsed ? item.label : undefined}
+                    >
                       <span className="nav-icon">{item.icon}</span>
                       {!collapsed ? <span>{item.label}</span> : null}
                     </Link>
