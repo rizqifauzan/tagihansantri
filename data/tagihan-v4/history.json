@@ -1,5 +1,45 @@
 [
   {
+    "id": "BATCH-1772681637083-35",
+    "batchName": "Update Batch 5 Mar 2026, 10.30",
+    "metode": "TUNAI",
+    "adminUsername": "admin",
+    "createdAt": "2026-03-05T03:33:57.084Z",
+    "totalItem": 3,
+    "totalSantri": 1,
+    "totalNominal": 66000,
+    "items": [
+      {
+        "tagihanId": "cmm7avkoo0015kx6hi5hx3ogf",
+        "nis": "NS20260001",
+        "santriNama": "Rizqi",
+        "kelas": "Alfiyyah 1",
+        "tagihanLabel": "Buku Raport (INS:2026-03-01:2026-06-09)",
+        "action": "edit",
+        "nominalBayar": 26000
+      },
+      {
+        "tagihanId": "cmma0yw6b0000kxlyww5g9s5g",
+        "nis": "NS20260001",
+        "santriNama": "Rizqi",
+        "kelas": "Alfiyyah 1",
+        "tagihanLabel": "Syahriyyah 2026 (2026-01)",
+        "action": "lunas",
+        "nominalBayar": 20000
+      },
+      {
+        "tagihanId": "cmma0z5fc000akxly0uv8wlui",
+        "nis": "NS20260001",
+        "santriNama": "Rizqi",
+        "kelas": "Alfiyyah 1",
+        "tagihanLabel": "Syahriyyah 2026 (2026-02)",
+        "action": "lunas",
+        "nominalBayar": 20000
+      }
+    ],
+    "files": []
+  },
+  {
     "id": "BATCH-1772581635006-152",
     "batchName": "Update Batch 4 Mar 2026, 06.47",
     "metode": "TUNAI",

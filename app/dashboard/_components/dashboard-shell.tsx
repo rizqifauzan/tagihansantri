@@ -116,6 +116,8 @@ export function DashboardShell({
         .toUpperCase(),
     [username],
   );
+  const mainGroups = groups.slice(0, -1);
+  const systemGroup = groups[groups.length - 1];
 
   return (
     <ToastProvider>
@@ -174,10 +176,32 @@ export function DashboardShell({
           </div>
 
           <nav className="sidebar-nav" aria-label="Navigasi utama">
-            {groups.map((group, index) => (
-              <div key={group.title} className={`nav-group ${index === groups.length - 1 ? "is-system" : ""}`}>
-                {!collapsed ? <p className="group-label">{group.title}</p> : null}
-                {group.items.map((item) => {
+            <div className="sidebar-nav-main">
+              {mainGroups.map((group) => (
+                <div key={group.title} className="nav-group">
+                  {!collapsed ? <p className="group-label">{group.title}</p> : null}
+                  {group.items.map((item) => {
+                    const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={`nav-link ${active ? "is-active" : ""}`}
+                        data-tooltip={collapsed ? item.label : undefined}
+                        aria-label={collapsed ? item.label : undefined}
+                      >
+                        <span className="nav-icon">{item.icon}</span>
+                        {!collapsed ? <span>{item.label}</span> : null}
+                      </Link>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            {systemGroup ? (
+              <div className="nav-group is-system sidebar-bottom">
+                {!collapsed ? <p className="group-label">{systemGroup.title}</p> : null}
+                {systemGroup.items.map((item) => {
                   const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                   return (
                     <Link
@@ -193,7 +217,7 @@ export function DashboardShell({
                   );
                 })}
               </div>
-            ))}
+            ) : null}
           </nav>
         </aside>
 
