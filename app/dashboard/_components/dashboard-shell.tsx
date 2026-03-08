@@ -116,6 +116,12 @@ export function DashboardShell({
   );
   const mainGroups = groups.slice(0, -1);
   const systemGroup = groups[groups.length - 1];
+  function isNavItemActive(href: string): boolean {
+    if (href === "/tagihan-v4") {
+      return pathname === href;
+    }
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
 
   return (
     <ToastProvider>
@@ -179,7 +185,7 @@ export function DashboardShell({
                 <div key={group.title} className="nav-group">
                   {!collapsed ? <p className="group-label">{group.title}</p> : null}
                   {group.items.map((item) => {
-                    const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                    const active = isNavItemActive(item.href);
                     return (
                       <Link
                         key={item.href}
@@ -200,7 +206,7 @@ export function DashboardShell({
               <div className="nav-group is-system sidebar-bottom">
                 {!collapsed ? <p className="group-label">{systemGroup.title}</p> : null}
                 {systemGroup.items.map((item) => {
-                  const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                  const active = isNavItemActive(item.href);
                   return (
                     <Link
                       key={item.href}

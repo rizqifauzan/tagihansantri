@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Card, Modal } from "@/app/dashboard/_components/primitives";
 
@@ -39,28 +40,6 @@ type Master = {
   keterangan: string | null;
   details: MasterDetail[];
   komponen: Komponen;
-};
-
-type PreviewRes = {
-  targetCount: number;
-  totalNominal: number;
-  totalNominalAwal: number;
-  totalDiskon: number;
-  periodeKey: string;
-  skippedDuplicateCount: number;
-  previewLimit: number;
-  preview: Array<{
-    santriId: string;
-    nis: string;
-    nama: string;
-    nominalAwal: number;
-    persentaseDiskon: number;
-    nominalDiskon: number;
-    nominalAkhir: number;
-    kategoriDiskon: { id: string; kode: string; nama: string } | null;
-    picUserId: string | null;
-    picUsername: string | null;
-  }>;
 };
 
 function toDateInputValue(date: Date): string {
@@ -122,22 +101,12 @@ export default function TagihanMasterPage() {
   const [jatuhTempo, setJatuhTempo] = useState("");
   const [keterangan, setKeterangan] = useState("");
 
-  const [selectedMasterId, setSelectedMasterId] = useState("");
-  const [previewMonth, setPreviewMonth] = useState(String(now.getMonth() + 1));
-  const [previewYear, setPreviewYear] = useState(String(now.getFullYear()));
-  const [preview, setPreview] = useState<PreviewRes | null>(null);
-  const [confirmGenerate, setConfirmGenerate] = useState(false);
   const [editingId, setEditingId] = useState("");
   const [formOpen, setFormOpen] = useState(false);
 
   const selectedKomponen = useMemo(
     () => komponen.find((k) => k.id === komponenId) || null,
     [komponen, komponenId],
-  );
-
-  const selectedMaster = useMemo(
-    () => rows.find((r) => r.id === selectedMasterId) || null,
-    [rows, selectedMasterId],
   );
 
   async function loadMaster() {
@@ -297,7 +266,6 @@ export default function TagihanMasterPage() {
       setSpesifik([]);
     }
 
-    setPreview(null);
     setMessage("Mode edit aktif");
     setFormOpen(true);
   }
@@ -408,72 +376,12 @@ export default function TagihanMasterPage() {
     }
   }
 
-  async function onPreview() {
-    if (!selectedMasterId) {
-      setMessage("Pilih master tagihan terlebih dahulu");
-      return;
-    }
-
-    setMessage("");
-    const payload = selectedMaster?.komponen.tipe === "BULANAN"
-      ? { periodeBulan: Number(previewMonth), periodeTahun: Number(previewYear) }
-      : {};
-
-    const res = await fetch(`/api/tagihan-master/${selectedMasterId}/preview`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const json = await res.json();
-    if (!res.ok) {
-      setMessage(json.message || "Gagal preview");
-      return;
-    }
-
-    setPreview(json);
-  }
-
-  async function onGenerateManual() {
-    if (!selectedMasterId) {
-      setMessage("Pilih master tagihan terlebih dahulu");
-      return;
-    }
-
-    setMessage("");
-    const payload = {
-      confirmed: confirmGenerate,
-      source: "manual",
-      ...(selectedMaster?.komponen.tipe === "BULANAN"
-        ? { periodeBulan: Number(previewMonth), periodeTahun: Number(previewYear) }
-        : {}),
-    };
-
-    const res = await fetch(`/api/tagihan-master/${selectedMasterId}/generate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const json = await res.json();
-    if (!res.ok) {
-      setMessage(json.message || "Generate gagal");
-      return;
-    }
-
-    setMessage(
-      `Generate selesai. Periode ${json.periodeKey}. Generated: ${json.generatedCount}, Skipped: ${json.skippedCount}`,
-    );
-    setConfirmGenerate(false);
-    setPreview(null);
-    await loadMaster();
-  }
-
   return (
     <section className="dashboard-main">
       <header className="page-head">
         <div>
-          <h2>Pembuatan Tagihan</h2>
-          <p>Kelola master pembuatan tagihan untuk skenario bulanan, insidental, dan santri baru.</p>
+          <h2>Pembuatan Tagihan Master</h2>
+          <p>Kelola master tagihan untuk skenario bulanan, insidental, dan santri baru.</p>
         </div>
       </header>
 
@@ -482,6 +390,9 @@ export default function TagihanMasterPage() {
         <button type="button" onClick={() => { resetForm(); setFormOpen(true); }}>
           {editingId ? "Tambah Master" : "Buat Master"}
         </button>
+        <Link href="/dashboard/tagihan-master/generate" className="btn-secondary">
+          Preview &amp; Generate Tagihan
+        </Link>
       </div>
       <p className="hint-text">
         Bulanan: 1 master untuk rentang start-end bulan. Auto generate tanggal 10 (WIB) bisa ON/OFF.
@@ -694,83 +605,6 @@ export default function TagihanMasterPage() {
       </Modal>
 
       {message ? <p className="error-text">{message}</p> : null}
-
-      <div className="form-grid">
-        <h3>Preview & Generate Manual</h3>
-
-        <label htmlFor="selectedMaster">Pilih Master</label>
-        <select id="selectedMaster" value={selectedMasterId} onChange={(e) => setSelectedMasterId(e.target.value)}>
-          <option value="">- pilih -</option>
-          {rows.filter((r) => r.status !== "ENDED").map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.namaTagihan || `${r.komponen.kode} - ${r.komponen.nama}`} ({r.status})
-            </option>
-          ))}
-        </select>
-
-        {selectedMaster?.komponen.tipe === "BULANAN" ? (
-          <>
-            <label htmlFor="previewMonth">Periode Bulan (manual)</label>
-            <input id="previewMonth" type="number" min="1" max="12" value={previewMonth} onChange={(e) => setPreviewMonth(e.target.value)} />
-            <label htmlFor="previewYear">Periode Tahun (manual)</label>
-            <input id="previewYear" type="number" min="2000" max="3000" value={previewYear} onChange={(e) => setPreviewYear(e.target.value)} />
-          </>
-        ) : null}
-
-        <div className="row-actions">
-          <button type="button" onClick={onPreview}>Preview</button>
-        </div>
-
-        {preview ? (
-          <div className="stack-block">
-            <div className="hint-text">
-              Target: {formatNumber(preview.targetCount)} santri | Awal: {formatNumber(preview.totalNominalAwal)} | Diskon: {formatNumber(preview.totalDiskon)} | Akhir: {formatNumber(preview.totalNominal)} | Periode: {preview.periodeKey}
-            </div>
-            <div className="hint-text">
-              Menampilkan {formatNumber(preview.preview.length)} dari {formatNumber(preview.targetCount)} calon tagihan (duplikat dilewati: {formatNumber(preview.skippedDuplicateCount)})
-            </div>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>NIS</th>
-                    <th>Nama Santri</th>
-                    <th>Nominal Awal</th>
-                    <th>Diskon%</th>
-                    <th>Potongan</th>
-                    <th>Nominal Akhir</th>
-                    <th>Kategori</th>
-                    <th>PIC</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {preview.preview.map((row) => (
-                    <tr key={row.santriId}>
-                      <td>{row.nis}</td>
-                      <td>{row.nama}</td>
-                      <td>{formatNumber(row.nominalAwal)}</td>
-                      <td>{formatNumber(row.persentaseDiskon)}</td>
-                      <td>{formatNumber(row.nominalDiskon)}</td>
-                      <td>{formatNumber(row.nominalAkhir)}</td>
-                      <td>{row.kategoriDiskon ? `${row.kategoriDiskon.kode} - ${row.kategoriDiskon.nama}` : "-"}</td>
-                      <td>{row.picUsername || "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : null}
-
-        <label className="checkbox-row">
-          <input type="checkbox" checked={confirmGenerate} onChange={(e) => setConfirmGenerate(e.target.checked)} />
-          Saya sudah cek preview dan siap generate
-        </label>
-
-        <div className="row-actions">
-          <button type="button" onClick={onGenerateManual}>Generate Manual</button>
-        </div>
-      </div>
 
       <div className="table-wrap">
         <table>

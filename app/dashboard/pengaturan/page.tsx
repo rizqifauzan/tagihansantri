@@ -24,8 +24,8 @@ const groups: SettingGroup[] = [
     description: "Atur komponen, rule nominal, dan proses pembuatan tagihan periodik.",
     links: [
       { label: "Komponen", href: "/dashboard/komponen-tagihan", note: "Master jenis komponen tagihan" },
-      { label: "Rule Tagihan", href: "/dashboard/rule-tagihan", note: "Cakupan nominal per target" },
-      { label: "Pembuatan", href: "/dashboard/tagihan-master", note: "Master generate tagihan" },
+      { label: "Pembuatan Master", href: "/dashboard/tagihan-master", note: "Buat dan ubah template master tagihan" },
+      { label: "Preview & Generate", href: "/dashboard/tagihan-master/generate", note: "Preview target dan generate manual" },
     ],
   },
   {
