@@ -201,11 +201,12 @@ button:disabled {
 .dashboard-layout {
   width: calc(100% - 24px);
   margin: 12px auto;
-  min-height: calc(100vh - 24px);
+  height: calc(100vh - 24px);
   display: grid;
   grid-template-columns: 264px 1fr;
   gap: 14px;
   transition: grid-template-columns 0.25s ease;
+  overflow: hidden;
 }
 
 .dashboard-layout.is-collapsed {
@@ -220,9 +221,9 @@ button:disabled {
   padding: 10px;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 24px);
-  position: sticky;
-  top: 12px;
+  height: 100%;
+  min-height: 0;
+  position: relative;
 }
 
 .sidebar-top {
@@ -374,8 +375,11 @@ button:disabled {
 }
 
 .sidebar-nav-main {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
   gap: 8px;
+  flex: 1;
   min-height: 0;
   overflow-y: auto;
   padding-right: 2px;
@@ -391,8 +395,8 @@ button:disabled {
 }
 
 .sidebar-bottom {
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--line-soft);
   flex-shrink: 0;
 }
@@ -506,6 +510,9 @@ button:disabled {
   box-shadow: var(--shadow);
   padding: 16px;
   min-width: 0;
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .dashboard-content>section:not(.dashboard-main) {
@@ -1157,11 +1164,30 @@ tbody tr:hover {
 @media (max-width: 1024px) {
   .dashboard-layout {
     grid-template-columns: 1fr;
+    height: auto;
+    overflow: visible;
   }
 
   .sidebar {
     min-height: auto;
     position: static;
+  }
+
+  .sidebar-nav {
+    height: auto;
+    min-height: auto;
+    flex: initial;
+  }
+
+  .sidebar-nav-main {
+    overflow-y: visible;
+    min-height: auto;
+  }
+
+  .sidebar-bottom {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line-soft);
   }
 
   .dashboard-layout.is-collapsed {
@@ -1179,6 +1205,8 @@ tbody tr:hover {
 
   .dashboard-content {
     padding: 12px;
+    height: auto;
+    overflow: visible;
   }
 
   .toolbar input {
