@@ -38,10 +38,8 @@ const groups: NavGroup[] = [
     items: [
       { label: "Tagihan", href: "/dashboard/tagihan", icon: <Icon path="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5" /> },
       { label: "Pembayaran", href: "/dashboard/pembayaran", icon: <Icon path="M3 7h18v10H3zM3 10h18M8 15h2" /> },
-      { label: "Laporan", href: "/dashboard/tagihan-matrix", icon: <Icon path="M4 19h16M7 16V8m5 8V5m5 11v-6" /> },
-      { label: "Laporan V2", href: "/dashboard/tagihan-v2", icon: <Icon path="M4 19h16M7 16V8m5 8V5m5 11v-6M3 3l18 18" /> },
-      { label: "Laporan V3", href: "/tagihan-v3", icon: <Icon path="M15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9M15 3l6 6M15 3v6h6" /> },
-      { label: "Laporan V4", href: "/tagihan-v4", icon: <Icon path="M15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9M15 3l6 6M15 3v6h6M8 13h8M8 17h6" /> },
+      { label: "Singkron Data", href: "/tagihan-v4", icon: <Icon path="M15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9M15 3l6 6M15 3v6h6M8 13h8M8 17h6" /> },
+      { label: "Bayar Batch", href: "/tagihan-v4-bayar", icon: <Icon path="M3 7h18v10H3zM3 10h18M8 15h2M14 15h2" /> },
       { label: "History V4", href: "/tagihan-v4/history", icon: <Icon path="M12 8v5l3 2M12 3a9 9 0 1 0 9 9 9 9 0 0 0-9-9z" /> },
     ],
   },

@@ -65,7 +65,7 @@ type CellState =
 
 const fmt = (n: number) => n.toLocaleString("id-ID");
 const parseInput = (v: string) => Number(v.replace(/\./g, "").replace(/,/g, ".").trim());
-const DRAFT_STORAGE_KEY = "tagihan-v4-drafts-v1";
+const DRAFT_STORAGE_KEY = "tagihan-v4-bayar-drafts-v1";
 
 const isEditable = (cell: CellData) =>
   cell.tagihanId !== null &&
@@ -128,6 +128,7 @@ function EditableCellV4({
 
   const editable = isEditMode && isEditable(cell);
   const effectiveSisa = draft ? draft.newSisa : cell.sisa;
+  const effectiveNominalBayar = draft ? draft.nominalBayar : 0;
 
   useEffect(() => {
     setState({ type: "idle" });
@@ -137,20 +138,22 @@ function EditableCellV4({
     if (state.type === "editing") inputRef.current?.focus();
   }, [state.type]);
 
-  function setDraft(nextSisa: number, action: "edit" | "lunas") {
+  function setDraftByNominalBayar(nominalBayarInput: number, action: "edit" | "lunas") {
     if (!cell.tagihanId) return;
-    if (!Number.isFinite(nextSisa) || nextSisa < 0 || nextSisa > cell.sisa) {
-      setState({ type: "error", message: "Nilai sisa tidak valid" });
+    if (!Number.isFinite(nominalBayarInput) || nominalBayarInput < 0 || nominalBayarInput > cell.sisa) {
+      setState({ type: "error", message: "Nominal dibayar tidak valid" });
       return;
     }
 
-    if (nextSisa === cell.sisa) {
+    if (nominalBayarInput === 0) {
       onDraftClear(cell.tagihanId);
       setState({ type: "idle" });
       return;
     }
 
-    const nominalBayar = cell.sisa - nextSisa;
+    const nextSisa = cell.sisa - nominalBayarInput;
+    const nominalBayar = nominalBayarInput;
+    const nextAction: "edit" | "lunas" = nominalBayarInput === cell.sisa ? "lunas" : action;
 
     onDraftUpsert({
       tagihanId: cell.tagihanId,
@@ -163,7 +166,7 @@ function EditableCellV4({
       originalSisa: cell.sisa,
       newSisa: nextSisa,
       nominalBayar,
-      action,
+      action: nextAction,
     });
 
     setState({ type: "idle" });
@@ -196,13 +199,13 @@ function EditableCellV4({
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              setDraft(parseInput(state.value), "edit");
+              setDraftByNominalBayar(parseInput(state.value), "edit");
             }
             if (e.key === "Escape") setState({ type: "idle" });
           }}
-          onBlur={() => setDraft(parseInput(state.value), "edit")}
+          onBlur={() => setDraftByNominalBayar(parseInput(state.value), "edit")}
         />
-        <span className="v3-cell-hint">Sisa awal: {fmt(cell.sisa)}</span>
+        <span className="v3-cell-hint">Maks dibayar: {fmt(cell.sisa)}</span>
       </span>
     );
   }
@@ -211,19 +214,19 @@ function EditableCellV4({
     <span className="v3-cell-editable">
       <span
         className="v3-cell-value-action"
-        onClick={() => setState({ type: "editing", value: String(effectiveSisa) })}
-        title={`Klik angka untuk edit · Sisa saat ini: ${fmt(effectiveSisa)}`}
+        onClick={() => setState({ type: "editing", value: String(effectiveNominalBayar || "") })}
+        title={`Klik untuk input nominal dibayar · Sisa saat ini: ${fmt(effectiveSisa)}`}
       >
-        {fmt(effectiveSisa)}
+        {effectiveNominalBayar > 0 ? fmt(effectiveNominalBayar) : "Input bayar"}
       </span>
 
       <span
         className="v3-cell-edit-icon v3-cell-lunas-action"
         onClick={(e) => {
           e.stopPropagation();
-          setDraft(0, "lunas");
+          setDraftByNominalBayar(cell.sisa, "lunas");
         }}
-        title="Set draft lunas"
+        title="Bayar lunas (set nominal dibayar = sisa)"
       >
         ✓
       </span>
@@ -456,8 +459,8 @@ export default function TagihanV4Page() {
       <aside className="v3-sidebar">
         <div className="v3-sidebar-inner">
           <div className="v3-brand">
-            <span className="v3-brand-title">Laporan Matrix V4</span>
-            <span className="v3-brand-sub">Draft Batch Pembayaran</span>
+            <span className="v3-brand-title">Bayar Batch V4</span>
+            <span className="v3-brand-sub">Input Nominal Dibayar</span>
           </div>
 
           <div className="v3-filter-section">
@@ -543,9 +546,9 @@ export default function TagihanV4Page() {
               onClick={() => setIsEditMode((p) => !p)}
             >
               <span className="v3-editmode-icon">✏</span>
-              {isEditMode ? "Exit Edit Mode" : "Edit Mode"}
+              {isEditMode ? "Exit Bayar batch" : "Bayar batch"}
             </button>
-            {isEditMode ? <span className="v3-editmode-hint">Perubahan disimpan sebagai draft sampai submit</span> : null}
+            {isEditMode ? <span className="v3-editmode-hint">Nominal dibayar disimpan sebagai draft sampai submit</span> : null}
           </div>
         </div>
 
@@ -564,7 +567,7 @@ export default function TagihanV4Page() {
             </div>
 
             <div className="v4-notice">
-              Semua perubahan belum masuk DB sebelum tombol <strong>Submit Draft</strong> dikonfirmasi.
+              Semua input nominal bayar belum masuk DB sebelum tombol <strong>Submit Draft</strong> dikonfirmasi.
             </div>
           </>
         ) : null}
@@ -574,7 +577,7 @@ export default function TagihanV4Page() {
 
         {isEditMode ? (
           <div className="v3-editmode-legend">
-            <span className="v3-legend-item v3-legend-editable">• Bisa diedit / dilunasi</span>
+            <span className="v3-legend-item v3-legend-editable">• Bisa input nominal dibayar / lunasi</span>
             <span className="v3-legend-item v3-legend-paid">• Sudah lunas</span>
             <span className="v3-legend-item v3-legend-empty">• Tidak ada tagihan</span>
             <span className="v3-legend-desc">Cell merah = perubahan draft belum tersubmit</span>

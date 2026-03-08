@@ -1,5 +1,27 @@
 [
   {
+    "id": "BATCH-1772936650113-534",
+    "batchName": "Update Batch 8 Mar 2026, 09.24",
+    "metode": "TUNAI",
+    "adminUsername": "admin",
+    "createdAt": "2026-03-08T02:24:10.114Z",
+    "totalItem": 1,
+    "totalSantri": 1,
+    "totalNominal": 25000,
+    "items": [
+      {
+        "tagihanId": "cmm7awy8q001okx6hcxrpth5m",
+        "nis": "NS20260006",
+        "santriNama": "Silaji",
+        "kelas": "TPQ 4",
+        "tagihanLabel": "Biaya Pendaftaran (INS:2026-03-01:2026-03-31)",
+        "action": "lunas",
+        "nominalBayar": 25000
+      }
+    ],
+    "files": []
+  },
+  {
     "id": "BATCH-1772681637083-35",
     "batchName": "Update Batch 5 Mar 2026, 10.30",
     "metode": "TUNAI",
