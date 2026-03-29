@@ -6,6 +6,10 @@ import { prisma } from "@/lib/prisma";
 type Params = { params: Promise<{ id: string }> };
 
 const VALID_STATUS = new Set(Object.values(TagihanStatus));
+const TAGIHAN_STATUS_ACTIVE = (
+  (TagihanStatus as unknown as Record<string, TagihanStatus>).AKTIF ||
+  (TagihanStatus as unknown as Record<string, TagihanStatus>).TERBIT
+) as TagihanStatus;
 
 function isTransitionAllowed(current: TagihanStatus, next: TagihanStatus): boolean {
   if (current === next) return true;
@@ -13,11 +17,11 @@ function isTransitionAllowed(current: TagihanStatus, next: TagihanStatus): boole
 
   switch (current) {
     case "DRAFT":
-      return next === "AKTIF" || next === "BATAL";
-    case "AKTIF":
+      return next === TAGIHAN_STATUS_ACTIVE || next === "BATAL";
+    case TAGIHAN_STATUS_ACTIVE:
       return next === "SEBAGIAN" || next === "LUNAS" || next === "BATAL" || next === "DRAFT";
     case "SEBAGIAN":
-      return next === "LUNAS" || next === "BATAL" || next === "AKTIF";
+      return next === "LUNAS" || next === "BATAL" || next === TAGIHAN_STATUS_ACTIVE;
     default:
       return false;
   }
@@ -51,14 +55,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     );
   }
 
-  if (existing.nominal <= 0 && nextStatus === "AKTIF") {
+  if (existing.nominal <= 0 && nextStatus === TAGIHAN_STATUS_ACTIVE) {
     return NextResponse.json(
       { message: "Tagihan nominal 0 harus berstatus LUNAS dan tidak bisa diset ke AKTIF" },
       { status: 400 },
     );
   }
 
-  if ((nextStatus === "DRAFT" || nextStatus === "AKTIF") && paymentCount > 0) {
+  if ((nextStatus === "DRAFT" || nextStatus === TAGIHAN_STATUS_ACTIVE) && paymentCount > 0) {
     return NextResponse.json(
       { message: "Tagihan yang sudah memiliki pembayaran tidak bisa dikembalikan ke DRAFT/AKTIF" },
       { status: 400 },
@@ -66,7 +70,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const nextNominalTerbayar =
-    nextStatus === "DRAFT" || nextStatus === "AKTIF"
+    nextStatus === "DRAFT" || nextStatus === TAGIHAN_STATUS_ACTIVE
       ? 0
       : nextStatus === "LUNAS"
         ? existing.nominal
