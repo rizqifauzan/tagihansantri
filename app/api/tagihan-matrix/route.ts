@@ -65,7 +65,7 @@ function buildTagihanWhere(filter: MatrixFilter, q: string): Prisma.TagihanWhere
   if (filter === "ALL") return base;
   if (filter === "LUNAS") return { ...base, status: TagihanStatus.LUNAS };
   if (filter === "SUDAH_DIBAYAR") return { ...base, nominalTerbayar: { gt: 0 } };
-  if (filter === "BELUM_LUNAS") return { ...base, status: { in: [TagihanStatus.TERBIT, TagihanStatus.SEBAGIAN] } };
+  if (filter === "BELUM_LUNAS") return { ...base, status: { in: [TagihanStatus.AKTIF, TagihanStatus.SEBAGIAN] } };
   if (filter === "BATAL") return { ...base, status: TagihanStatus.BATAL };
   if (filter === "DRAFT") return { ...base, status: TagihanStatus.DRAFT };
   return { ...base, status: { notIn: [TagihanStatus.BATAL, TagihanStatus.DRAFT] } };

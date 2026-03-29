@@ -1,5 +1,36 @@
 [
   {
+    "id": "BATCH-1774767835511-119",
+    "batchName": "Update Batch 29 Mar 2026, 14.03",
+    "metode": "TUNAI",
+    "adminUsername": "admin",
+    "createdAt": "2026-03-29T07:03:55.517Z",
+    "totalItem": 2,
+    "totalSantri": 1,
+    "totalNominal": 17000,
+    "items": [
+      {
+        "tagihanId": "cmm7axdph001skx6h0fdkbppj",
+        "nis": "NS20260007",
+        "santriNama": "Fuad Keluarga",
+        "kelas": "Jurumiyyah 2",
+        "tagihanLabel": "Biaya Pendaftaran (INS:2026-03-01:2026-03-31)",
+        "action": "edit",
+        "nominalBayar": 10000
+      },
+      {
+        "tagihanId": "cmma0z5fc000gkxly0e9u1icr",
+        "nis": "NS20260007",
+        "santriNama": "Fuad Keluarga",
+        "kelas": "Jurumiyyah 2",
+        "tagihanLabel": "Syahriyyah 2026 (2026-02)",
+        "action": "lunas",
+        "nominalBayar": 7000
+      }
+    ],
+    "files": []
+  },
+  {
     "id": "BATCH-1772940363214-784",
     "batchName": "Update Batch 8 Mar 2026, 10.24",
     "metode": "TUNAI",

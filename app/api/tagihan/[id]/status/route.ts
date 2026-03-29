@@ -13,11 +13,11 @@ function isTransitionAllowed(current: TagihanStatus, next: TagihanStatus): boole
 
   switch (current) {
     case "DRAFT":
-      return next === "TERBIT" || next === "BATAL";
-    case "TERBIT":
+      return next === "AKTIF" || next === "BATAL";
+    case "AKTIF":
       return next === "SEBAGIAN" || next === "LUNAS" || next === "BATAL" || next === "DRAFT";
     case "SEBAGIAN":
-      return next === "LUNAS" || next === "BATAL" || next === "TERBIT";
+      return next === "LUNAS" || next === "BATAL" || next === "AKTIF";
     default:
       return false;
   }
@@ -51,22 +51,22 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     );
   }
 
-  if (existing.nominal <= 0 && nextStatus === "TERBIT") {
+  if (existing.nominal <= 0 && nextStatus === "AKTIF") {
     return NextResponse.json(
-      { message: "Tagihan nominal 0 harus berstatus LUNAS dan tidak bisa diset ke TERBIT" },
+      { message: "Tagihan nominal 0 harus berstatus LUNAS dan tidak bisa diset ke AKTIF" },
       { status: 400 },
     );
   }
 
-  if ((nextStatus === "DRAFT" || nextStatus === "TERBIT") && paymentCount > 0) {
+  if ((nextStatus === "DRAFT" || nextStatus === "AKTIF") && paymentCount > 0) {
     return NextResponse.json(
-      { message: "Tagihan yang sudah memiliki pembayaran tidak bisa dikembalikan ke DRAFT/TERBIT" },
+      { message: "Tagihan yang sudah memiliki pembayaran tidak bisa dikembalikan ke DRAFT/AKTIF" },
       { status: 400 },
     );
   }
 
   const nextNominalTerbayar =
-    nextStatus === "DRAFT" || nextStatus === "TERBIT"
+    nextStatus === "DRAFT" || nextStatus === "AKTIF"
       ? 0
       : nextStatus === "LUNAS"
         ? existing.nominal

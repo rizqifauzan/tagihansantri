@@ -25,7 +25,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ message: "Tagihan BATAL tidak bisa dibayar" }, { status: 400 });
   }
   if (existing.status === "DRAFT") {
-    return NextResponse.json({ message: "Tagihan DRAFT belum bisa dibayar. Publish dulu ke TERBIT." }, { status: 400 });
+    return NextResponse.json({ message: "Tagihan DRAFT belum bisa dibayar. Publish dulu ke AKTIF." }, { status: 400 });
   }
   if (existing.status === "LUNAS") {
     return NextResponse.json({ message: "Tagihan sudah LUNAS" }, { status: 400 });

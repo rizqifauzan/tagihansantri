@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 type Kelas = {
   id: string;
   nama: string;
@@ -161,6 +163,9 @@ export default function KelasPage() {
                 <td>{row.active ? "Aktif" : "Nonaktif"}</td>
                 <td>
                   <div className="row-actions">
+                    <Link href={`/dashboard/kelas/${row.id}`} className="btn-secondary btn-link">
+                      Detail
+                    </Link>
                     <button
                       type="button"
                       onClick={() => {

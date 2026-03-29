@@ -73,6 +73,83 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
 }
 
+export async function GET(req: NextRequest, { params }: Params) {
+  const unauthorized = await requireAdmin(req);
+  if (unauthorized) return unauthorized;
+
+  const { id } = await params;
+
+  const santri = await prisma.santri.findUnique({
+    where: { id },
+    include: {
+      kelas: { select: { id: true, nama: true } },
+      keluarga: {
+        select: {
+          id: true,
+          kodeKeluarga: true,
+          namaKepalaFamily: true,
+          keterangan: true,
+        },
+      },
+    },
+  });
+
+  if (!santri) {
+    return NextResponse.json({ message: "Santri tidak ditemukan" }, { status: 404 });
+  }
+
+  const [aggregate, groupedStatus, recentTagihan] = await Promise.all([
+    prisma.tagihan.aggregate({
+      where: { santriId: id },
+      _count: { _all: true },
+      _sum: {
+        nominal: true,
+        nominalTerbayar: true,
+      },
+    }),
+    prisma.tagihan.groupBy({
+      by: ["status"],
+      where: { santriId: id },
+      _count: { _all: true },
+    }),
+    prisma.tagihan.findMany({
+      where: { santriId: id },
+      orderBy: [{ periodeKey: "desc" }, { createdAt: "desc" }],
+      take: 20,
+      include: {
+        komponen: { select: { kode: true, nama: true } },
+        pembayaran: {
+          orderBy: { tanggalBayar: "desc" },
+          take: 1,
+          select: {
+            tanggalBayar: true,
+            nominal: true,
+            metode: true,
+            adminUsername: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  return NextResponse.json({
+    data: {
+      ...santri,
+      ringkasanTagihan: {
+        totalTagihan: aggregate._count._all,
+        totalNominal: aggregate._sum.nominal || 0,
+        totalTerbayar: aggregate._sum.nominalTerbayar || 0,
+        totalTunggakan: (aggregate._sum.nominal || 0) - (aggregate._sum.nominalTerbayar || 0),
+        perStatus: groupedStatus.reduce<Record<string, number>>((acc, item) => {
+          acc[item.status] = item._count._all;
+          return acc;
+        }, {}),
+      },
+      tagihanTerbaru: recentTagihan,
+    },
+  });
+}
+
 export async function DELETE(req: NextRequest, { params }: Params) {
   const unauthorized = await requireAdmin(req);
   if (unauthorized) return unauthorized;

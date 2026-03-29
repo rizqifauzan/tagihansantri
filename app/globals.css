@@ -170,6 +170,17 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
 .btn-secondary {
   background: #eef3fb;
   color: #2c4873;

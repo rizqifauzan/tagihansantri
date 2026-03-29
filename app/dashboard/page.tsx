@@ -10,7 +10,7 @@ type TagihanRow = {
   periodeKey: string;
   nominal: number;
   nominalTerbayar: number;
-  status: "DRAFT" | "TERBIT" | "SEBAGIAN" | "LUNAS" | "BATAL";
+  status: "DRAFT" | "AKTIF" | "SEBAGIAN" | "LUNAS" | "BATAL";
   jatuhTempo: string;
   santri: { kelas: { nama: string } | null };
 };
@@ -78,7 +78,7 @@ export default function DashboardPage() {
 
     const totalTunggakan = tagihanRows.reduce((sum, row) => {
       const sisa = Math.max(0, row.nominal - row.nominalTerbayar);
-      if (row.status === "TERBIT" || row.status === "SEBAGIAN") return sum + sisa;
+      if (row.status === "AKTIF" || row.status === "SEBAGIAN") return sum + sisa;
       return sum;
     }, 0);
 

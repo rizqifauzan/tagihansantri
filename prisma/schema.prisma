@@ -65,7 +65,7 @@ enum TagihanMasterStatus {
 
 enum TagihanStatus {
   DRAFT
-  TERBIT
+  AKTIF
   SEBAGIAN
   LUNAS
   BATAL
@@ -280,7 +280,7 @@ model Tagihan {
   nominalTerbayar Float      @default(0)
   picUserId      String?
   jatuhTempo    DateTime
-  status        TagihanStatus @default(TERBIT)
+  status        TagihanStatus @default(AKTIF)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 

@@ -153,7 +153,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             nominalTerbayar: isZeroBill ? r.nominalAkhir : 0,
             picUserId: picMap.get(r.santriId) || null,
             jatuhTempo: generatedDueDate,
-            status: isZeroBill ? "LUNAS" : (master.komponen.tipe === "INSIDENTAL" ? "DRAFT" : "TERBIT"),
+            status: isZeroBill ? "LUNAS" : (master.komponen.tipe === "INSIDENTAL" ? "DRAFT" : "AKTIF"),
           };
         }),
       });

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Card, EmptyState, Modal, Popover, Tabs } from "@/app/dashboard/_components/primitives";
 import { useToast } from "@/app/dashboard/_components/toast";
@@ -401,6 +402,7 @@ export default function SantriPage() {
                     </td>
                     <td>
                       <div className="row-actions">
+                        <Link className="btn-secondary btn-link" href={`/dashboard/santri/${row.id}`}>Detail</Link>
                         <button type="button" className="btn-secondary" onClick={() => openEditModal(row)}>Edit</button>
                         <button type="button" className="btn-danger" onClick={() => onDelete(row.id)}>Hapus</button>
                       </div>

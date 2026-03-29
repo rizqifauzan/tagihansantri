@@ -95,7 +95,7 @@ export async function autoApplySantriBaruTagihan(santri: NewSantriInput): Promis
           nominalTerbayar: isZeroBill ? row.nominalAkhir : 0,
           picUserId,
           jatuhTempo: dueDate,
-          status: isZeroBill ? "LUNAS" : "TERBIT",
+          status: isZeroBill ? "LUNAS" : "AKTIF",
         },
       ],
     });

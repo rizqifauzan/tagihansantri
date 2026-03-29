@@ -134,7 +134,7 @@ async function runAutoGenerate(req: NextRequest) {
               nominalTerbayar: isZeroBill ? t.nominalAkhir : 0,
               picUserId: picMap.get(t.santriId) || null,
               jatuhTempo: toMonthlyDueDate(master.jatuhTempo, now.month, now.year),
-              status: isZeroBill ? "LUNAS" : "TERBIT",
+              status: isZeroBill ? "LUNAS" : "AKTIF",
             };
           }),
         });

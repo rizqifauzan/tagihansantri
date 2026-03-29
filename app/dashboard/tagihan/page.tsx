@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Card, EmptyState, Modal, Popover, Tabs } from "@/app/dashboard/_components/primitives";
 import { useToast } from "@/app/dashboard/_components/toast";
 
-type TagihanStatus = "DRAFT" | "TERBIT" | "SEBAGIAN" | "LUNAS" | "BATAL";
+type TagihanStatus = "DRAFT" | "AKTIF" | "SEBAGIAN" | "LUNAS" | "BATAL";
 type Row = {
   id: string;
   periodeKey: string;
@@ -21,7 +21,7 @@ type Row = {
 };
 type UserOption = { id: string; username: string; active: boolean };
 
-const STATUS_OPTIONS: TagihanStatus[] = ["DRAFT", "TERBIT", "SEBAGIAN", "LUNAS", "BATAL"];
+const STATUS_OPTIONS: TagihanStatus[] = ["DRAFT", "AKTIF", "SEBAGIAN", "LUNAS", "BATAL"];
 const formatNumber = (value: number) => value.toLocaleString("id-ID");
 const parseNumberInput = (value: string) => Number((value || "").replace(/\./g, "")) || 0;
 const formatNumberInput = (value: string) => {
@@ -51,7 +51,7 @@ export default function TagihanPage() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<Row | null>(null);
-  const [nextStatus, setNextStatus] = useState<TagihanStatus>("TERBIT");
+  const [nextStatus, setNextStatus] = useState<TagihanStatus>("AKTIF");
 
   const { pushToast } = useToast();
 
@@ -182,7 +182,7 @@ export default function TagihanPage() {
 
   const filteredRows = useMemo(() => {
     if (tab === "LUNAS") return rows.filter((row) => row.status === "LUNAS");
-    if (tab === "TUNGGAKAN") return rows.filter((row) => row.status === "TERBIT" || row.status === "SEBAGIAN");
+    if (tab === "TUNGGAKAN") return rows.filter((row) => row.status === "AKTIF" || row.status === "SEBAGIAN");
     return rows;
   }, [rows, tab]);
 
@@ -312,7 +312,7 @@ export default function TagihanPage() {
                     <td>
                       <div className="row-actions">
                         <button type="button" className="btn-secondary" onClick={() => openEditModal(row)}>Edit</button>
-                        {(row.status === "TERBIT" || row.status === "SEBAGIAN") ? (
+                        {(row.status === "AKTIF" || row.status === "SEBAGIAN") ? (
                           <button type="button" onClick={() => openPaymentForm(row)}>Bayar</button>
                         ) : null}
                       </div>
