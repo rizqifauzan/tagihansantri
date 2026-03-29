@@ -33,6 +33,11 @@ const VALID_COUNT_VIEW: MatrixCountView[] = [
   "SEMUA",
 ];
 
+const TAGIHAN_STATUS_ACTIVE = (
+  (TagihanStatus as unknown as Record<string, TagihanStatus>).AKTIF ||
+  (TagihanStatus as unknown as Record<string, TagihanStatus>).TERBIT
+) as TagihanStatus;
+
 function normalizeFilter(value: string): MatrixFilter {
   return VALID_FILTERS.includes(value as MatrixFilter) ? (value as MatrixFilter) : "ALL";
 }
@@ -65,7 +70,7 @@ function buildTagihanWhere(filter: MatrixFilter, q: string): Prisma.TagihanWhere
   if (filter === "ALL") return base;
   if (filter === "LUNAS") return { ...base, status: TagihanStatus.LUNAS };
   if (filter === "SUDAH_DIBAYAR") return { ...base, nominalTerbayar: { gt: 0 } };
-  if (filter === "BELUM_LUNAS") return { ...base, status: { in: [TagihanStatus.AKTIF, TagihanStatus.SEBAGIAN] } };
+  if (filter === "BELUM_LUNAS") return { ...base, status: { in: [TAGIHAN_STATUS_ACTIVE, TagihanStatus.SEBAGIAN] } };
   if (filter === "BATAL") return { ...base, status: TagihanStatus.BATAL };
   if (filter === "DRAFT") return { ...base, status: TagihanStatus.DRAFT };
   return { ...base, status: { notIn: [TagihanStatus.BATAL, TagihanStatus.DRAFT] } };
