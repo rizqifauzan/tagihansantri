@@ -4,6 +4,8 @@ import { env } from "@/lib/env";
 
 export async function POST(req: Request) {
   const contentType = req.headers.get("content-type") || "";
+  const accept = req.headers.get("accept") || "";
+  const wantsJson = contentType.includes("application/json") || accept.includes("application/json");
 
   let username = "";
   let password = "";
@@ -19,11 +21,16 @@ export async function POST(req: Request) {
   }
 
   if (username !== env.adminUsername || password !== env.adminPassword) {
-    return NextResponse.json({ message: "Username atau password salah" }, { status: 401 });
+    if (wantsJson) {
+      return NextResponse.json({ message: "Username atau password salah" }, { status: 401 });
+    }
+    return NextResponse.redirect(new URL("/login?error=invalid_credentials", req.url));
   }
 
   const token = await createSessionToken("admin-local", username);
-  const res = NextResponse.redirect(new URL("/dashboard", req.url));
+  const res = wantsJson
+    ? NextResponse.json({ ok: true, redirectTo: "/dashboard" })
+    : NextResponse.redirect(new URL("/dashboard", req.url));
 
   res.cookies.set({
     name: SESSION_COOKIE,
